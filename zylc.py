@@ -495,7 +495,7 @@ class LightCurve(object):
         p = jarr.argsort()
         return(jarr[p], marr[p], earr[p], iarr[p])
 
-def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0):
+def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type="flux"):
     """ Read light curve file(s) into a LightCurve object.
 
     Parameters
@@ -512,6 +512,9 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0):
 
     timeoffset: float
         The offset added to the time array in `lcfile`, so that t_final = t_orig + timeoffset
+
+    dat_type: str
+        The type of measurement data.
 
     Returns
     -------
@@ -537,6 +540,31 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0):
         lclist = []
         for lcf in lcfile :
             lc = readlc_3c(lcf)
+            # convert the mag data to flux, but the error needs @ZHW
+            if dat_type == "flux":
+                
+                if lcf == lcfile[0]:
+
+                    # set the maximum of continuum the reference value @ZHW
+                    F0 = max(lc[0][1])
+                lc[0][1] = [lc[0][1][i] / F0 for i in range(len(lc[0][1]))]
+                lc[0][2] = [lc[0][2][i] / F0 for i in range(len(lc[0][2]))]
+                pass
+            elif dat_type == "mag":
+                
+                if lcf == lcfile[0]:
+                    # set the maximum of continuum the reference value @ZHW
+                    F0 = 10**(-0.4 * min(lc[0][1]))
+                # normalize the whole lightcurve, Only when different bands have the same zero-point! @ZHW
+                lc[0][1] = [10**(-0.4 * lc[0][1][i]) / F0 for i in range(len(lc[0][1]))]
+                # transform the mag error to (relative) flux error @ZHW
+                lc[0][2] = [10**(-0.4 * (lc[0][1][i] - min(lc[0][1]))) * np.log(10) * 0.4 * (lc[0][2][i]**2 + (lc[0][2][np.argmin(lc[0][1])])**2)**0.5 \
+                for i in range(len(lc[0][2]))]
+                
+                '''
+                lc[0][1] = [3631 * 10**(- 0.4 * lc[0][1][i]) for i in range(len(lc[0][1]))]
+                lc[0][2] = [0.4 * 3631 * 10**(- 0.4 * lc[0][1][i]) * np.log(10) * lc[0][2][i] for i in range(len(lc[0][2]))]
+                '''
             lclist.append(lc[0])
     for ilc in xrange(len(lclist)) :
         lclist[ilc][0] = np.atleast_1d(lclist[ilc][0]) + timeoffset

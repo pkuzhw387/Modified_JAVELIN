@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from cholesky_utils import cholesky, chosolve_from_tri, chodet_from_tri
 from zylc import LightCurve
 from cov import get_covfunc_dict
-from spear import spear, spear_threading
+from spear import spear, spear_threading, spear2, spear_threading2
 from predict import (PredictSignal, PredictRmap, PredictPmap, PredictSPmap,
                      PredictSCmap)
 from gp import FullRankCovariance, NearlyFullRankCovariance
@@ -17,6 +17,7 @@ from err import InputError, UsageError
 from emcee import EnsembleSampler
 from graphic import figure_handler
 from copy import copy
+import gc
 
 my_neg_inf = float(-1.0e+300)
 my_pos_inf = float(+1.0e+300)
@@ -1276,8 +1277,8 @@ class Rmap_Model(object):
         p0 = np.random.rand(nwalkers*self.ndim).reshape(nwalkers, self.ndim)
         # initialize array
         if conthpd is None:
-            p0[:, 0] += np.log(self.cont_std)-0.5
-            p0[:, 1] += np.log(np.sqrt(self.rj*self.cont_cad))-0.5
+            pass
+            
         else:
             p0[:, 0] += conthpd[1,0]-0.5
             p0[:, 1] += conthpd[1,1]-0.5
@@ -1529,7 +1530,7 @@ class Rmap_Model(object):
 # ---------------------------------
 # Pmap_Model: Two-Band Spectroscopic RM
 
-def unpackphotopar(p, nlc=2, hascontlag=False):
+def unpackphotopar(p, nlc=2, hascontlag=False, GPmodel="DRW"):
     """ Unpack the physical parameters from input 1-d array for photo mode.
 
     Currently only two bands, one on and on off the line emission.
@@ -1537,8 +1538,12 @@ def unpackphotopar(p, nlc=2, hascontlag=False):
     """
     if nlc != 2:
         raise InputError("Pmap_Model cannot cope with more than two bands yet")
-    sigma = np.exp(p[0])
-    tau = np.exp(p[1])
+    if GPmodel == "pow-law":
+        A = np.exp(p[0])
+        gamma = np.tan(p[1])
+    elif GPmodel == "DRW":
+        sigma = np.exp(p[0])
+        tau = np.exp(p[1])
     if hascontlag:
         lags = np.zeros(3)
         wids = np.zeros(3)
@@ -1548,8 +1553,13 @@ def unpackphotopar(p, nlc=2, hascontlag=False):
         wids[1] = p[3]
         scales[1] = p[4]
         # continuum contribution
-        scales[2] = p[5]
-        return(sigma, tau, lags, wids, scales)
+        lags[2] = p[5]
+        wids[2] = p[6]
+        scales[2] = p[7]
+        if GPmodel == "pow-law":
+            return(A, gamma, lags, wids, scales)
+        elif GPmodel == "DRW":
+            return(sigma, tau, lags, wids, scales)
     else:
         llags = np.zeros(2)
         lwids = np.zeros(2)
@@ -1559,13 +1569,16 @@ def unpackphotopar(p, nlc=2, hascontlag=False):
         lscales[0] = p[4]
         # continuum contribution
         lscales[1] = p[5]
-        return(sigma, tau, llags, lwids, lscales)
+        if GPmodel == "pow-law":
+            return(A, gamma, llags, lwids, lscales)
+        elif GPmodel == "DRW":
+            return(sigma, tau, llags, lwids, lscales)
 
 
-def lnpostfn_photo_p(p, zydata, conthpd=None, set_extraprior=False,
+def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, set_extraprior=False,
                      lagtobaseline=0.3, laglimit=None, widtobaseline=0.2,
                      widlimit=None, set_threading=False, blocksize=10000,
-                     set_retq=False, set_verbose=False):
+                     set_retq=False, set_verbose=False, lagpenaled=None):
     """ log-posterior function of p.
 
     Parameters
@@ -1607,24 +1620,45 @@ def lnpostfn_photo_p(p, zydata, conthpd=None, set_extraprior=False,
 
     """
     # unpack the parameters from p
-    sigma, tau, llags, lwids, lscales = unpackphotopar(p, zydata.nlc,
-                                                       hascontlag=False)
+    # Add a scale param here.
+    if GPmodel == "pow-law":
+        A, gamma, llags, lwids, lscales = unpackphotopar(p, zydata.nlc,hascontlag=hascontlag, GPmodel="pow-law")
+    elif GPmodel == "DRW":
+        sigma, tau, llags, lwids, lscales = unpackphotopar(p, zydata.nlc,hascontlag=hascontlag)
     if set_retq:
-        vals = list(lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales,
-                                   set_retq=True, set_verbose=set_verbose,
-                                   set_threading=set_threading,
-                                   blocksize=blocksize))
+        if GPmodel == "pow-law":
+            vals = list(lnlikefn_photo2(zydata, A, gamma, llags, lwids, lscales,
+                                       set_retq=True, set_verbose=set_verbose,
+                                       set_threading=set_threading,
+                                       blocksize=blocksize, hascontlag=hascontlag))
+        elif GPmodel == "DRW":
+        	vals = list(lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales,
+                                   	set_retq=True, set_verbose=set_verbose,
+                                   	set_threading=set_threading,
+                                   	blocksize=blocksize, hascontlag=hascontlag))
     else:
-        logl = lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales,
-                              set_retq=False, set_verbose=set_verbose,
-                              set_threading=set_threading, blocksize=blocksize)
+        if GPmodel == "pow-law":
+            logl = lnlikefn_photo2(zydata, A, gamma, llags, lwids, lscales,
+                                  set_retq=False, set_verbose=set_verbose,
+                                  set_threading=set_threading, blocksize=blocksize, hascontlag=hascontlag)
+        elif GPmodel == "DRW":
+            logl = lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales,
+                                  set_retq=False, set_verbose=set_verbose,
+                                  set_threading=set_threading, blocksize=blocksize, hascontlag=hascontlag)
+
+
+
+
+
     # conthpd is in natural log
     if conthpd is not None:
+        #for A
         # for sigma
         if p[0] < conthpd[1,0]:
             prior0 = (p[0] - conthpd[1,0])/(conthpd[1,0]-conthpd[0,0])
         else:
             prior0 = (p[0] - conthpd[1,0])/(conthpd[2,0]-conthpd[1,0])
+        #for gamma
         # for tau
         if p[1] < conthpd[1,1]:
             prior1 = (p[1] - conthpd[1,1])/(conthpd[1,1]-conthpd[0,1])
@@ -1635,12 +1669,18 @@ def lnpostfn_photo_p(p, zydata, conthpd=None, set_extraprior=False,
         prior1 = 0.0
     # for each lag
     prior2 = 0.0
-    if lagtobaseline < 1.0:
-        if np.abs(llags[0]) > lagtobaseline*zydata.rj:
-            # penalize long lags when larger than 0.3 times the baseline,
-            # as it is too easy to fit the model with non-overlapping
-            # signals in the light curves.
-            prior2 += np.log(np.abs(llags[0])/(lagtobaseline*zydata.rj))
+    # We add a absolute limit of the lag above which would be penalized, but not to infinity. @ZHW
+    if lagpenaled == None:
+        if lagtobaseline < 1.0:
+            if np.abs(llags[0]) > lagtobaseline*zydata.rj:
+                # penalize long lags when larger than 0.3 times the baseline,
+                # as it is too easy to fit the model with non-overlapping
+                # signals in the light curves.
+                prior2 += np.log(np.abs(llags[0])/(lagtobaseline*zydata.rj))
+    else: 
+        if np.abs(llags[0]) > lagpenaled:
+            prior2 += np.log(np.abs(llags[0])/lagpenaled)
+    
     # penalize long lags to be impossible
     if laglimit is not None:
         if llags[0] > laglimit[0][1] or llags[0] < laglimit[0][0]:
@@ -1668,6 +1708,22 @@ def lnpostfn_photo_p(p, zydata, conthpd=None, set_extraprior=False,
         # }}}
     # add logp of all the priors
     prior = -0.5*(prior0*prior0+prior1*prior1) - prior2
+    # prior on the time delay of the line, 
+    # maybe not necessary given the penalty on extreme lags
+    '''
+    if lag_0 is not None:
+    	if 0.25 * lag_0 <= llags[0] <= 4 * lag_0:
+    		prior -= (np.log10(llags[0]) - np.log10(lag_0))**2 / np.log10(2)
+    	else: prior -= my_pos_inf
+    else:
+    	print "No lag reference given, take 20 as an reference."
+    	lag_0 = 20.0
+    	if 0.25 * lag_0 <= llags[0] <= 4 * lag_0:
+    		prior -= (np.log10(llags[0]) - np.log10(lag_0))**2 / np.log10(2)
+    	else: prior -= my_pos_inf
+    '''
+
+
     # print p
     # print prior
     if set_retq:
@@ -1679,13 +1735,68 @@ def lnpostfn_photo_p(p, zydata, conthpd=None, set_extraprior=False,
         return(logp)
 
 
-def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, set_retq=False,
-                   set_verbose=False, set_threading=False, blocksize=10000):
+
+def lnlikefn_photo2(zydata, A, gamma, llags, lwids, lscales, set_retq=False,
+                   set_verbose=False, set_threading=False, blocksize=10000, hascontlag=False):
     """ Log-likelihood function.
     """
     if zydata.issingle:
         raise UsageError("lnlikefn_photo does not work for single mode")
-    # impossible scenarios
+    if (A <= 0.0 or gamma <= 0.0 or np.min(lwids) < 0.0 or
+            np.min(lscales) < 0.0 or np.max(np.abs(llags)) > zydata.rj):
+        return(_exit_with_retval(zydata.nlc, set_retq,
+                                 errmsg="Warning: illegal input of parameters",
+                                 set_verbose=set_verbose))
+    # set_pmap = True
+    # fill in lags/wids/scales
+    lags = np.zeros(3)
+    wids = np.zeros(3)
+    scales = np.ones(3)
+    if hascontlag:
+        lags[:] = llags[:]
+        wids[:] = lwids[:]
+        scales[:] = lscales[:]
+    else:
+        lags[1:] = llags[:]
+        wids[1:] = lwids[:]
+        scales[1:] = lscales[:]        
+    
+    
+    if set_threading:
+        C = spear_threading2(zydata.jarr, zydata.jarr, zydata.iarr,
+                            zydata.iarr, A, gamma, lags, wids, scales,
+                            set_pmap=True, blocksize=blocksize)
+    else:
+        C = spear2(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, A,
+                  gamma, lags, wids, scales, set_pmap=True)
+    # decompose C inplace
+    #print C
+    U, info = cholesky(C, nugget=zydata.varr, inplace=True, raiseinfo=False)
+    #print info
+    # handle exceptions here
+    if info > 0:
+        return(_exit_with_retval(
+            zydata.nlc, set_retq,
+            errmsg="Warning: non positive-definite covariance C #3",
+            set_verbose=set_verbose))
+    retval = _lnlike_from_U(U, zydata, set_retq=set_retq,
+                            set_verbose=set_verbose)
+    return(retval)
+
+'''
+# Equivalent width likelihood function, not finished yet.
+def lnlikefn_EW(line_scale, cont_scale, filter_func=None):
+	return
+'''
+
+
+
+def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, set_retq=False,
+                   set_verbose=False, set_threading=False, blocksize=10000, hascontlag=False):
+    """ Log-likelihood function.
+    """
+    if zydata.issingle:
+        raise UsageError("lnlikefn_photo does not work for single mode")
     if (sigma <= 0.0 or tau <= 0.0 or np.min(lwids) < 0.0 or
             np.min(lscales) < 0.0 or np.max(np.abs(llags)) > zydata.rj):
         return(_exit_with_retval(zydata.nlc, set_retq,
@@ -1696,9 +1807,27 @@ def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, set_retq=False,
     lags = np.zeros(3)
     wids = np.zeros(3)
     scales = np.ones(3)
-    lags[1:] = llags[:]
-    wids[1:] = lwids[:]
-    scales[1:] = lscales[:]
+    if hascontlag:
+        lags[:] = llags[:]
+        wids[:] = lwids[:]
+        scales[:] = lscales[:]
+    else:
+        lags[1:] = llags[:]
+        wids[1:] = lwids[:]
+        scales[1:] = lscales[:]        
+    
+    #print "lags", lags
+    #print "wids", wids
+    #print "scales", scales
+    '''
+    if set_threading:
+        C = spear_threading(zydata.jarr, zydata.jarr, zydata.iarr,
+                            zydata.iarr, A, gamma, lags, wids, scales,
+                            set_pmap=True, blocksize=blocksize)
+    else:
+        C = spear(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, A,
+                  gamma, lags, wids, scales, set_pmap=True)
+    '''
     if set_threading:
         C = spear_threading(zydata.jarr, zydata.jarr, zydata.iarr,
                             zydata.iarr, sigma, tau, lags, wids, scales,
@@ -1706,9 +1835,12 @@ def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, set_retq=False,
     else:
         C = spear(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, sigma,
                   tau, lags, wids, scales, set_pmap=True)
+
     # decompose C inplace
+    #print C
     U, info = cholesky(C, nugget=zydata.varr, inplace=True, raiseinfo=False)
     # handle exceptions here
+    #print info
     if info > 0:
         return(_exit_with_retval(
             zydata.nlc, set_retq,
@@ -1720,13 +1852,16 @@ def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, set_retq=False,
 
 
 class Pmap_Model(object):
-    def __init__(self, zydata=None, linename="line"):
+    def __init__(self, GPmodel="DRW", zydata=None, linename="line", hascontlag=False):
         """ Pmap Model object.
 
         Parameters
         ----------
         zydata: LightCurve object, optional
             Light curve data.
+
+	GPmodel: str.
+	    Name of the gaussian process model.
 
         linename: str, optional
             Name of the emission line (default: 'line').
@@ -1736,6 +1871,7 @@ class Pmap_Model(object):
         if zydata is None:
             pass
         else:
+            self.GPmodel = GPmodel
             self.nlc = zydata.nlc
             self.npt = zydata.npt
             self.cont_npt = zydata.nptlist[0]
@@ -1745,29 +1881,49 @@ class Pmap_Model(object):
             self.jstart = zydata.jstart
             self.jend = zydata.jend
             self.names = zydata.names
-            # number of parameters
+            self.hascontlag=hascontlag
+            # number of parameters (band-continuum not considered@ZHW)
             self.ndim = 6
-            self.vars = ["sigma", "tau"]
-            self.texs = [r"$\log\,\sigma$", r"$\log\,\tau$"]
-            #
-            self.vars.append("_".join(["lag", linename]))
-            self.vars.append("_".join(["wid", linename]))
-            self.vars.append("_".join(["scale", linename]))
+            #number of parameters(band-continuum considered@ZHW)
+            if self.hascontlag:
+                self.ndim = 8
+            # When using the power-law model, we modify self.vars=["A", "gamma"] @ZHW
+            if self.GPmodel == "DRW":
+                self.vars = ["sigma", "tau"]
+                self.texs = [r"$\log\,\sigma$", r"$\log\,\tau$"]
+            elif self.GPmodel == "pow-law":
+                self.vars = ["A", "gamma"]
+                self.texs = [r"$\log\,\AA$", r"$\arctan\,\gamma$"]
+            ##the letter "r" before a string prohibits escape character
+            #Add an additional scale here to describe the scale between the continuum of the line band and the pure continuum band.
+            self.vars.append("_".join(["lag", linename])) 
+            self.vars.append("_".join(["wid", linename])) 
+            self.vars.append("_".join(["scale", linename])) #self.vars:["sigma", "tau", "lag_linename", "wid_linename", "scale_linename"]
             self.texs.append("".join([r"$t_{", linename, r"}$"]))
             self.texs.append("".join([r"$w_{", linename, r"}$"]))
             self.texs.append("".join([r"$s_{", linename, r"}$"]))
             #
             self.vars.append("alpha")
             self.texs.append(r"$\alpha$")
+            self.hascontlag = hascontlag
+            if self.hascontlag:
+                self.vars.append("cont_lag")
+                self.texs.append(r"$t_{cont}$")
+                self.vars.append("cont_wid")
+                self.texs.append(r"$w_{cont}$")
 
     def __call__(self, p, **lnpostparams):
         """ Calculate the posterior value given one parameter set `p`.
 
         Parameters
         ----------
+        #p: array_like
+            Pmap_Model parameters, [log(A), arctan(gamma), lag, wid, scale,
+            alpha].
         p: array_like
             Pmap_Model parameters, [log(sigma), log(tau), lag, wid, scale,
             alpha].
+
 
         lnpostparams: kwargs
             Kewword arguments for `lnpostfn_photo_p`.
@@ -1787,6 +1943,9 @@ class Pmap_Model(object):
 
         Parameters
         ----------
+        #p_ini: array_like
+            Pmap_Model parameters [log(A), log(gamma), lag, wid, scale,
+            alpha].
         p_ini: array_like
             Pmap_Model parameters [log(sigma), log(tau), lag, wid, scale,
             alpha].
@@ -1819,14 +1978,21 @@ class Pmap_Model(object):
         else:
             func = lambda _p: -lnpostfn_photo_p(_p,
                                                 self.zydata, **lnpostparams)
+        #fmin() comes from scipy.
         p_bst, v_bst = fmin(func, p_ini, full_output=True)[:2]
         if fixed is not None:
             p_bst = p_bst*fixed+p_ini*(1.-fixed)
-        sigma, tau, llags, lwids, lscales = unpackphotopar(
-            p_bst, self.zydata.nlc, hascontlag=False)
+        if self.GPmodel == "pow-law":
+            A, gamma, llags, lwids, lscales = unpackphotopar(p_bst, self.zydata.nlc, hascontlag=False)
+        elif self.GPmodel == "DRW":
+            sigma, tau, llags, lwids, lscales = unpackphotopar(
+                p_bst, self.zydata.nlc, hascontlag=False)
         if set_verbose:
             print("Best-fit parameters are")
-            print("sigma %8.3f tau %8.3f" % (sigma, tau))
+            if self.GPmodel == "pow-law":
+                print("A %8.3f gamma %8.3f" % (A, gamma))
+            elif self.GPmodel == "DRW":
+                print("sigma %8.3f tau %8.3f" % (sigma, tau))
             print("%s %8.3f %s %8.3f %s %8.3f" % (
                 self.vars[2], llags[0], self.vars[3], lwids[0],
                 self.vars[4], lscales[0]))
@@ -1834,7 +2000,7 @@ class Pmap_Model(object):
             print("with logp  %10.5g " % -v_bst)
         return(p_bst, -v_bst)
 
-    def do_mcmc(self, conthpd=None, set_extraprior=False, lagtobaseline=0.3,
+    def do_mcmc(self, conthpd=None, set_extraprior=False, lagtobaseline=0.3, lagpenaled=None,
                 laglimit="baseline", widtobaseline=0.2, widlimit="nyquist",
                 nwalkers=100, nburn=100, nchain=100, threads=1, fburn=None,
                 fchain=None, flogp=None, set_threading=False, blocksize=10000,
@@ -1867,6 +2033,7 @@ class Pmap_Model(object):
         elif len(widlimit) != 1:
             raise InputError("widlimit should be a list of a single list")
         # generate array of random numbers
+        # Add a scale param here.
         p0 = np.random.rand(nwalkers*self.ndim).reshape(nwalkers, self.ndim)
         # initialize array
         if conthpd is None:
@@ -1884,10 +2051,17 @@ class Pmap_Model(object):
         if set_verbose:
             print("start burn-in")
             if conthpd is None:
-                print("no priors on sigma and tau")
+                if self.GPmodel == "pow-law":
+                    print("no priors on A and gamma")
+                elif self.GPmodel =="DRW":
+                    print("no priors on sigma and tau")
             else:
-                print("using priors on sigma and tau from continuum fitting")
+                if self.GPmodel == "pow-law":
+                    print("using priors on A and gamma from continuum fitting")
+                elif self.GPmodel =="DRW":
+                    print("using priors on sigma and tau from continuum fitting")
                 print(np.exp(conthpd))
+		print("the conthpd value of gamma are arctan-values!") 
             if lagtobaseline < 1.0:
                 print("penalize lags longer than %3.2f of the baseline" %
                       lagtobaseline)
@@ -1896,8 +2070,9 @@ class Pmap_Model(object):
             print("nburn: %d nwalkers: %d --> number of burn-in iterations: %d"
                   % (nburn, nwalkers, nburn*nwalkers))
         # initialize the ensemble sampler
+
         sampler = EnsembleSampler(nwalkers, self.ndim, lnpostfn_photo_p,
-                                  args=(self.zydata, conthpd, set_extraprior,
+                                  args=(self.zydata, self.GPmodel, self.hascontlag, conthpd, set_extraprior,
                                         lagtobaseline, laglimit, widtobaseline,
                                         widlimit, set_threading, blocksize,
                                         False, False), threads=threads)
@@ -1935,6 +2110,11 @@ class Pmap_Model(object):
         self.logp = np.ravel(sampler.lnprobability)
         self.logp_whole = np.copy(self.logp)
         self.get_bfp()
+        print "best param", self.bfp
+        sampler.reset()
+        del sampler
+        gc.collect()
+
 
     def get_hpd(self, set_verbose=True):
         """ Get the 68% percentile range of each parameter to self.hpd.
@@ -1946,15 +2126,29 @@ class Pmap_Model(object):
 
         """
         hpd = _get_hpd(self.ndim, self.flatchain)
-        for i in xrange(self.ndim):
-            if set_verbose:
-                print("HPD of %s" % self.vars[i])
-                if i < 2:
-                    print("low: %8.3f med %8.3f hig %8.3f" %
-                          tuple(np.exp(hpd[:,i])))
-                else:
-                    print("low: %8.3f med %8.3f hig %8.3f" %
-                          tuple(hpd[:,i]))
+        if self.GPmodel == "DRW":
+            for i in xrange(self.ndim):
+                if set_verbose:
+                    print("HPD of %s" % self.vars[i])
+                    if i < 2:
+                        print("low: %8.3f med %8.3f hig %8.3f" %
+                            tuple(np.exp(hpd[:,i])))
+                    else:
+                        print("low: %8.3f med %8.3f hig %8.3f" %
+                            tuple(hpd[:,i]))
+        elif self.GPmodel == "pow-law":
+             for i in xrange(self.ndim):
+                if set_verbose:
+                    print("HPD of %s" % self.vars[i])
+                    if i == 0:
+                        print("low: %8.3f med %8.3f hig %8.3f" %
+                            tuple(np.exp(hpd[:,i])))
+                    elif i == 1:
+                        print("low: %8.3f med %8.3f hig %8.3f" %
+                            tuple(np.tan(hpd[:,i])))
+                    else:
+                        print("low: %8.3f med %8.3f hig %8.3f" %
+                            tuple(hpd[:,i]))
         # register hpd to attr
         self.hpd = hpd
 
@@ -2003,12 +2197,19 @@ class Pmap_Model(object):
                                     int(np.max(self.flatchain[:,i]))+lagbinsize,
                                     lagbinsize)
                 ax.hist(self.flatchain[:,i], bins=lagbins)
+             #   ax.set_xlim((0, int(np.max(self.flatchain[:,i]))))
             else:
                 ax.hist(self.flatchain[:,i], bins)
             ax.set_xlabel(self.texs[i])
             ax.set_ylabel("N")
         # plt.get_current_fig_manager().toolbar.zoom()
-        return(figure_handler(fig=fig, figout=figout, figext=figext))
+        figure_handler(fig=fig, figout=figout, figext=figext)
+        self.flatchain = np.empty((2, 1))
+        plt.close()
+        gc.collect()
+ #       self = None
+#        gc.collect()
+
 
     def break_chain(self, llag_segments):
         """ Break the chain.
@@ -2098,14 +2299,23 @@ class Pmap_Model(object):
         """
         if p_bst is None and hasattr(self, "bfp"):
             p_bst = self.bfp
-        qlist = lnpostfn_photo_p(p_bst, self.zydata, set_retq=True,
+        print self.bfp
+        qlist = lnpostfn_photo_p(p_bst, self.zydata, GPmodel=self.GPmodel, set_retq=True,
                                  set_verbose=False)[4]
-        sigma, tau, lags, wids, scales = unpackphotopar(p_bst, self.zydata.nlc,
-                                                        hascontlag=True)
+        if self.GPmodel == "pow-law":
+            A, gamma, lags, wids, scales = unpackphotopar(p_bst, self.zydata.nlc,
+                                                            hascontlag=True, GPmodel="pow-law")
+        elif self.GPmodel == "DRW":
+            sigma, tau, lags, wids, scales = unpackphotopar(p_bst, self.zydata.nlc,
+                                                            hascontlag=True, GPmodel="DRW")
         # update qlist
         self.zydata.update_qlist(qlist)
         # initialize PredictRmap object
-        P = PredictPmap(zydata=self.zydata, sigma=sigma, tau=tau, lags=lags,
+        if self.GPmodel == "pow-law":
+            P = PredictPmap(GPmodel=self.GPmodel, zydata=self.zydata, A=A, gamma=gamma, lags=lags,
+                            wids=wids, scales=scales)
+        elif self.GPmodel == "DRW":
+            P = PredictPmap(GPmodel=self.GPmodel, zydata=self.zydata, sigma=sigma, tau=tau, lags=lags,
                         wids=wids, scales=scales)
         nwant = dense*self.cont_npt
         jwant0 = self.jstart - 0.1*self.rj
@@ -2121,7 +2331,7 @@ class Pmap_Model(object):
             mve_band = (zylclist_pred[0][1] - self.zydata.blist[0])*scales[-1]
             mve_line = (zylclist_pred[1][1] - self.zydata.blist[1])-mve_band
             mve_nonv = jwant * 0.0 + self.zydata.blist[1]
-        zydata_pred = LightCurve(zylclist_pred)
+        zydata_pred = LightCurve(zylclist_pred, set_subtractmean=False)
         if fpred is not None:
             zydata_pred.save(fpred, set_overwrite=set_overwrite)
         if set_decompose:
@@ -2286,6 +2496,7 @@ def lnlikefn_sbphoto(zydata, sigma, tau, lag, wid, scale, set_retq=False,
                   sigma,tau,lags,wids,scales, set_pmap=True)
     # decompose C inplace
     U, info = cholesky(C, nugget=zydata.varr, inplace=True, raiseinfo=False)
+
     # handle exceptions here
     if info > 0:
         return(_exit_with_retval(
@@ -2577,7 +2788,7 @@ class SPmap_Model(object):
             ax.set_xlabel(self.texs[i])
             ax.set_ylabel("N")
         return(figure_handler(fig=fig, figout=figout, figext=figext))
-
+        self = None
     def break_chain(self, llag_segments):
         """ Break the chain.
 
