@@ -5,7 +5,7 @@ from glob import glob
 
 __all__ = ['figure_handler']
 
-def figure_handler(fig=None, figout=None, figext=None, dpi=None, pad_inches=0.1, transparent=True):
+def figure_handler(fig=None, figout=None, figext=None, dpi=None, pad_inches=0.1, transparent=False):
     """ Handle the saving, drawing, and formating of figure objects.
 
     Parameters

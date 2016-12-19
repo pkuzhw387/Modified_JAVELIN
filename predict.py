@@ -4,7 +4,7 @@ from cholesky_utils import cholesky, cholesky2, trisolve, chosolve, chodet, chos
 import numpy as np
 from numpy.random import normal, multivariate_normal
 from cov import get_covfunc_dict
-from spear import spear, spear_threading
+from spear import spear, spear_threading, spear2, spear_threading2
 from zylc import LightCurve
 
 np.set_printoptions(precision=3)
@@ -386,7 +386,7 @@ class PredictRmap(object):
 class PredictSpear(object):
     """ Generate continuum and line light curves for 'Rmap', 'Pmap', and 'SPmap' `spearmodes`, but without data constraint.
     """
-    def __init__(self, sigma, tau, llags, lwids, lscales, spearmode="Rmap"):
+    def __init__(self, sigma, tau, llags, lwids, lscales, spearmode="Rmap", GPmodel="DRW", hascontlag=False):
         """
 
         llags, lwids, lscales: properties of the line transfer functions, all lists of length n_line.
@@ -395,10 +395,20 @@ class PredictSpear(object):
         2) if spearmode is "Pmap" , the transfer functions have     2 elmements, first for the line, second for the continuum under line band with lag=0 and width=0.
         3) if spearmode is "SPmap", the transfer functions have     2 elmement, first for the line, second with lag=0 and width=0.
         """
-        self.sigma = sigma
-        self.tau   = tau
+        if GPmodel == "pow-law":
+            self.GPmodel = "pow-law"
+            self.A = sigma
+            self.gamma   = tau
+        elif GPmodel == "DRW":
+            self.GPmodel = "DRW"
+            self.sigma = sigma
+            self.tau = tau
+
+        
+        
         # number of light curves including continuum
         self.nlc   = len(llags) + 1
+        print self.nlc
         self.lags  = np.zeros(self.nlc)
         self.wids  = np.zeros(self.nlc)
         self.scales = np.ones(self.nlc)
@@ -464,19 +474,36 @@ class PredictSpear(object):
         jarr, marr, earr, iarr = self._combineddataarr(npt, nptlist, jlist, mlist, elist, ilist)
         # get covariance function
         if set_threading :
-            if self.spearmode == "Rmap" :
-                cmatrix = spear_threading(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=False)
-            elif self.spearmode == "Pmap" :
-                cmatrix = spear_threading(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
-            elif self.spearmode == "SPmap" :
-                cmatrix = spear_threading(jarr, jarr, iarr+1, iarr+1, self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
+            if self.GPmodel == "DRW":
+                if self.spearmode == "Rmap" :
+                    cmatrix = spear_threading(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=False)
+                elif self.spearmode == "Pmap" :
+                    cmatrix = spear_threading(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
+                elif self.spearmode == "SPmap" :
+                    cmatrix = spear_threading(jarr, jarr, iarr+1, iarr+1, self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
+            elif self.GPmodel == "pow-law":
+                if self.spearmode == "Rmap" :
+                    cmatrix = spear_threading2(jarr, jarr, iarr  , iarr  , self.A, self.gamma, self.lags, self.wids, self.scales, set_pmap=False)
+                elif self.spearmode == "Pmap" :
+                    cmatrix = spear_threading2(jarr, jarr, iarr  , iarr  , self.A, self.gamma, self.lags, self.wids, self.scales, set_pmap=True)
+                elif self.spearmode == "SPmap" :
+                    cmatrix = spear_threading2(jarr, jarr, iarr+1, iarr+1, self.A, self.gamma, self.lags, self.wids, self.scales, set_pmap=True)
         else :
-            if self.spearmode == "Rmap" :
-                cmatrix = spear(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=False)
-            elif self.spearmode == "Pmap" :
-                cmatrix = spear(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
-            elif self.spearmode == "SPmap" :
-                cmatrix = spear(jarr, jarr, iarr+1, iarr+1, self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
+            if self.GPmodel == "DRW":
+                if self.spearmode == "Rmap" :
+                    cmatrix = spear(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=False)
+                elif self.spearmode == "Pmap" :
+                    cmatrix = spear(jarr, jarr, iarr  , iarr  , self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
+                elif self.spearmode == "SPmap" :
+                    cmatrix = spear(jarr, jarr, iarr+1, iarr+1, self.sigma, self.tau, self.lags, self.wids, self.scales, set_pmap=True)
+            elif self.GPmodel == "pow-law":
+                if self.spearmode == "Rmap" :
+                    cmatrix = spear2(jarr, jarr, iarr  , iarr  , self.A, self.gamma, self.lags, self.wids, self.scales, set_pmap=False)
+                elif self.spearmode == "Pmap" :
+                    cmatrix = spear2(jarr, jarr, iarr  , iarr  , self.A, self.gamma, self.lags, self.wids, self.scales, set_pmap=True)
+                elif self.spearmode == "SPmap" :
+                    cmatrix = spear2(jarr, jarr, iarr+1, iarr+1, self.A, self.gamma, self.lags, self.wids, self.scales, set_pmap=True)
+        #print cmatrix
         # cholesky decomposed cmatrix to L, for which a C array is desired.
         L = np.empty(cmatrix.shape, order='C')
         L[:] = cholesky2(cmatrix) # XXX without the error report.
@@ -534,7 +561,7 @@ class PredictSpear(object):
 class PredictPmap(object):
     """ Predict light curves for Pmap, with data constraints.
     """
-    def __init__(self, zydata, set_threading=False,  **covparams):
+    def __init__(self, GPmodel, zydata, set_threading=False,  **covparams):
         """ PredictPmap object.
 
         Parameters
@@ -546,6 +573,7 @@ class PredictPmap(object):
             Parameters for the spear covariance function.
 
         """
+        self.GPmodel = GPmodel
         self.zydata = zydata
         self.covparams = covparams
         self.jd = self.zydata.jarr
@@ -558,6 +586,7 @@ class PredictPmap(object):
         # preparation
         self.set_threading = set_threading
         self._get_covmat(set_threading=set_threading)
+        #print self.cmatrix
         self._get_cholesky()
         self._get_cplusninvdoty()
 
@@ -583,7 +612,6 @@ class PredictPmap(object):
         m, v = self._fastpredict(jwant, iwant, set_threading=self.set_threading)
         for i in xrange(len(jwant)) :
             m[i] += self.blist[int(iwant[i])-1]
-        print v
         return(m, v)
 
     def generate(self, zylclist) :
@@ -641,10 +669,26 @@ class PredictPmap(object):
         return(zylclist_new)
 
     def _get_covmat(self, set_threading=False) :
+        
         if set_threading :
-            self.cmatrix = spear_threading(self.jd,self.jd,self.id,self.id, set_pmap=True, **self.covparams)
+            if self.GPmodel == "pow-law":
+                self.cmatrix = spear_threading2(self.jd,self.jd,self.id,self.id, set_pmap=True, A=(self.covparams["A"]), gamma=(self.covparams["gamma"]),\
+                                                                                               lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                               scales=self.covparams["scales"])
+            elif self.GPmodel == "DRW":
+                self.cmatrix = spear_threading(self.jd,self.jd,self.id,self.id, set_pmap=True, sigma=self.covparams["sigma"], tau=self.covparams["tau"],\
+                                                                                               lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                               scales=self.covparams["scales"])      
         else :
-            self.cmatrix = spear(self.jd,self.jd,self.id,self.id, set_pmap=True, **self.covparams)
+            if self.GPmodel == "pow-law":
+                self.cmatrix = spear2(self.jd,self.jd,self.id,self.id, set_pmap=True, A=(self.covparams["A"]), gamma=(self.covparams["gamma"]),\
+                                                                                               lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                               scales=self.covparams["scales"])
+            elif self.GPmodel == "DRW":
+                self.cmatrix = spear(self.jd,self.jd,self.id,self.id, set_pmap=True, sigma=self.covparams["sigma"], tau=self.covparams["tau"],\
+                                                                                               lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                               scales=self.covparams["scales"])
+        #print self.cmatrix
         print("covariance matrix calculated")
 
     def _get_cholesky(self) :
@@ -664,18 +708,46 @@ class PredictPmap(object):
         vw = np.zeros_like(jw)
         for i, (jwant, iwant) in enumerate(zip(jw, iw)):
             if set_threading :
-                covar = spear_threading(jwant,self.jd,iwant,self.id, set_pmap=True, **self.covparams)
+                
+                if self.GPmodel == "pow-law":
+                    covar = spear_threading2(jwant,self.jd,iwant,self.id, set_pmap=True, A=(self.covparams["A"]), gamma=(self.covparams["gamma"]),\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
+                elif self.GPmodel == "DRW":
+                    covar = spear_threading(jwant,self.jd,iwant,self.id, set_pmap=True, sigma=self.covparams["sigma"], tau=self.covparams["tau"],\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
             else :
-                covar = spear(jwant,self.jd,iwant,self.id, set_pmap=True, **self.covparams)
+                if self.GPmodel == "pow-law":
+                    covar = spear2(jwant,self.jd,iwant,self.id, set_pmap=True, A=(self.covparams["A"]), gamma=(self.covparams["gamma"]),\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
+                elif self.GPmodel == "DRW":
+                    covar = spear(jwant,self.jd,iwant,self.id, set_pmap=True, sigma=self.covparams["sigma"], tau=self.covparams["tau"],\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
             cplusninvdotcovar = chosolve_from_tri(self.U, covar.T, nugget=None, inplace=False)
             if set_threading :
-                vw[i] = spear_threading(jwant, jwant, iwant, iwant, set_pmap=True, **self.covparams)
+                if self.GPmodel == "pow-law":
+                    vw[i] = spear_threading2(jwant, jwant, iwant, iwant, set_pmap=True, A=(self.covparams["A"]), gamma=(self.covparams["gamma"]),\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
+                elif self.GPmodel == "DRW":
+                    vw[i] = spear_threading(jwant, jwant, iwant, iwant, set_pmap=True, sigma=self.covparams["sigma"], tau=self.covparams["tau"],\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
             else :
-                vw[i] = spear(jwant, jwant, iwant, iwant, set_pmap=True, **self.covparams)
-            
+                if self.GPmodel == "pow-law":
+                    vw[i] = spear2(jwant, jwant, iwant, iwant, set_pmap=True, A=(self.covparams["A"]), gamma=(self.covparams["gamma"]),\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
+                elif self.GPmodel == "DRW":
+                    vw[i] = spear(jwant, jwant, iwant, iwant, set_pmap=True, sigma=self.covparams["sigma"], tau=self.covparams["tau"],\
+                                                                                        lags=self.covparams["lags"], wids=self.covparams["wids"],\
+                                                                                        scales=self.covparams["scales"])
+
             mw[i] = np.dot(covar, self.cplusninvdoty)
             vw[i] = vw[i] - np.dot(covar, cplusninvdotcovar)
-            
         return(mw, vw)
 
 class PredictSPmap(object):
@@ -1054,12 +1126,14 @@ def test_PredictSpear():
     llags = [10.0, 30.0]
     lwids = [ 2.0,  5.0]
     lscales = [ 0.5,  2.0]
-    ps = PredictSpear(sigma, tau, llags, lwids, lscales, spearmode="Rmap")
-    npt = 100
+    ps = PredictSpear(sigma, tau, llags, lwids, lscales, spearmode="Pmap", GPmodel="DRW")
+    npt = 50
     jarr = np.linspace(0.0, 200.0, npt)
     marr = np.ones(npt)*10.0
-    earr = np.zeros(npt)
-    lcdat = [ [jarr, marr, earr], [jarr, marr, earr], [jarr, marr, earr],]
+    #earr = np.zeros(npt)
+    earr = np.random.random_sample((npt, ))
+    #lcdat = [ [jarr, marr, earr], [jarr, marr, earr], [jarr, marr, earr],]
+    lcdat = [ [jarr, marr, earr], [jarr, marr, earr],]
     lcnew = ps.generate(lcdat, set_threading=False)
     zylc = LightCurve(lcnew)
     zylc.plot()
