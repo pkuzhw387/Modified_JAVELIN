@@ -545,21 +545,37 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type
             lc = readlc_3c(lcf)
             # convert the mag data to flux, but the error needs @ZHW
             if dat_type == "flux":
-                
+                '''
                 if lcf == lcfile[0]:
+                    #print lcf
 
                     # set the maximum of continuum the reference value @ZHW
                     F0 = max(lc[0][1])
-                    cont_lc = lc[0]
-                    cont_mean = np.mean(cont_lc)
+                    #print F0
+                    cont_lc = np.array(lc[0])
+                    cont_lc[1] = cont_lc[1] / F0
+                    cont_lc[2] = cont_lc[2] / F0
+                    print "cont_lc is ", cont_lc[1]
+                    cont_mean = np.mean(cont_lc[1])
                 lc[0][1] = [lc[0][1][i] / F0 for i in range(len(lc[0][1]))]
                 lc[0][2] = [lc[0][2][i] / F0 for i in range(len(lc[0][2]))]
+		'''
+		pass
+                '''
                 if lcf == lcfile[1]:
+                    print lcf
                     if cont_frac == 1:
+                        print "cont_mean is ", cont_mean
+                        print "line_mean is ", np.mean(lc[0][1])
                         cont_frac = np.mean(lc[0][1]) / cont_mean
-                    lc[0][1] = [lc[0][1][i] - cont_frac * cont_lc[1][np.argmin(cont_lc[0] - lc[0][0][i])] for i in range(len(lc[0][1]))]
-                    lc[0][2] = [(lc[0][2][i]**2 + (cont_frac * cont_lc[2][np.argmin(cont_lc[0] - lc[0][0][i])])**2)**0.5 for i in range(len(lc[0][2]))]
-                
+                    print "cont_frac is ", cont_frac
+                    print " flux before subtraction is", lc[0][1]
+                    #print "error before subtraction is", lc[0][2]
+                    lc[0][1] = [lc[0][1][i] - cont_frac * cont_lc[1][np.argmin(np.array(cont_lc[0]) - lc[0][0][i])] for i in range(len(lc[0][1]))]
+                    lc[0][2] = [(lc[0][2][i]**2 + (cont_frac * cont_lc[2][np.argmin(np.array(cont_lc[0]) - lc[0][0][i])])**2)**0.5 for i in range(len(lc[0][2]))]
+                    print "subtracted flux is", lc[0][1]
+                    #print "subtracted error is", lc[0][2]
+                '''
             elif dat_type == "mag":
                 
                 if lcf == lcfile[0]:
@@ -573,11 +589,15 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type
                 if lcf == lcfile[0]:
                     cont_lc = lc[0]
                     cont_mean = np.mean(cont_lc)
+                '''
                 if lcf == lcfile[1]:
                     if cont_frac == 1:
                         cont_frac = np.mean(lc[0][1]) / cont_mean
                     lc[0][1] = [lc[0][1][i] - cont_frac * cont_lc[1][np.argmin(np.array(cont_lc[0]) - lc[0][0][i])] for i in range(len(lc[0][1]))]
                     lc[0][2] = [(lc[0][2][i]**2 + (cont_frac * cont_lc[2][np.argmin(np.array(cont_lc[0]) - lc[0][0][i])])**2)**0.5 for i in range(len(lc[0][2]))]
+                    print "subtracted flux is", lc[0][1]
+                    print "subtracted error is", lc[0][2]
+                '''
                 '''
                 #subtract continuum from line band
                 if lcf == lcfile[1]:

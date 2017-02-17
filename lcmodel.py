@@ -1578,7 +1578,9 @@ def unpackphotopar(p, nlc=2, hascontlag=False, GPmodel="DRW"):
 def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, set_extraprior=False,
                      lagtobaseline=0.3, laglimit=None, widtobaseline=0.2,
                      widlimit=None, set_threading=False, blocksize=10000,
-                     set_retq=False, set_verbose=False, lagpenaled=None):
+                     set_retq=False, set_verbose=False, lagpenaled=None, tau0=None, zp1=None):
+	
+
     """ log-posterior function of p.
 
     Parameters
@@ -1617,6 +1619,12 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, s
         log-likelihood if True (default: False).
     set_verbose: bool, optional
         True if you want verbosity (default: False).
+    lag_penaled: bool, optional
+        True if we set an absolute limit on lag value
+    tau0: float, optional
+         reference value of lag obtained from R-L relationship
+     zp1: float, optional
+         1 + z of quasar, used to determine whether the lag value exceeds the limit. 
 
     """
     # unpack the parameters from p
@@ -1682,6 +1690,12 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, s
             prior2 += np.log(np.abs(llags[0])/lagpenaled)
     
     # penalize long lags to be impossible
+    if llags[0] < 0.0:
+	prior2 += my_pos_inf
+    lag_up = 4.0 * tau0 * zp1
+    lag_low = 0.25 * tau0 * zp1
+    if llags[0] > lag_up or llags[0] < lag_low:
+    	prior2 += my_pos_inf
     if laglimit is not None:
         if llags[0] > laglimit[0][1] or llags[0] < laglimit[0][0]:
             prior2 += my_pos_inf
@@ -1707,7 +1721,11 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, s
             prior2 += my_pos_inf
         # }}}
     # add logp of all the priors
-    prior = -0.5*(prior0*prior0+prior1*prior1) - prior2
+    if llags[0] <= 0.0:
+    	prior = -0.5*(prior0*prior0+prior1*prior1) - prior2
+    else:
+    	prior = -0.5*(prior0*prior0+prior1*prior1) - prior2 - (np.log10(llags[0]) - np.log10(tau0))**2.0 / (np.log10(2.0))
+
     # prior on the time delay of the line, 
     # maybe not necessary given the penalty on extreme lags
     '''
@@ -2004,7 +2022,7 @@ class Pmap_Model(object):
                 laglimit="baseline", widtobaseline=0.2, widlimit="nyquist",
                 nwalkers=100, nburn=100, nchain=100, threads=1, fburn=None,
                 fchain=None, flogp=None, set_threading=False, blocksize=10000,
-                set_verbose=True):
+                set_verbose=True, tau0=None, zp1=None):
         """ See `lnpostfn_photo_p` for doc, except for `laglimit` and `widlimit`,
         both of which have different default values ('baseline' / 'nyquist').
         'baseline' means the boundaries are naturally determined by the
@@ -2075,7 +2093,7 @@ class Pmap_Model(object):
                                   args=(self.zydata, self.GPmodel, self.hascontlag, conthpd, set_extraprior,
                                         lagtobaseline, laglimit, widtobaseline,
                                         widlimit, set_threading, blocksize,
-                                        False, False), threads=threads)
+                                        False, False, None, tau0, zp1), threads=threads)
         pos, prob, state = sampler.run_mcmc(p0, nburn)
         if set_verbose:
             print("burn-in finished")
