@@ -1828,34 +1828,41 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
 
     # for each lag
     prior2 = 0.0
-    # We add a absolute limit of the lag above which would be penalized, but not to infinity. @ZHW
-    if lagpenaled == None:
-        if lagtobaseline < 1.0:
-            if np.abs(llags[0]) > lagtobaseline*zydata.rj:
-                # penalize long lags when larger than 0.3 times the baseline,
-                # as it is too easy to fit the model with non-overlapping
-                # signals in the light curves.
-                prior2 += np.log(np.abs(llags[0])/(lagtobaseline*zydata.rj))
-    else: 
-        if np.abs(llags[0]) > lagpenaled:
-            prior2 += np.log(np.abs(llags[0])/lagpenaled)
-    
 
-    if tau > 10.0 * tau0:
-        return -np.inf
+
+    if lagtobaseline < 1.0:
+        if np.abs(llags[0]) > lagtobaseline*zydata.rj:
+            # penalize long lags when larger than 0.3 times the baseline,
+            # as it is too easy to fit the model with non-overlapping
+            # signals in the light curves.
+            prior2 += np.log(np.abs(llags[0])/(lagtobaseline*zydata.rj))
+
+    
+    if tau0 is not None:
+        if tau > 10.0 * tau0:
+            return -np.inf
 
     # penalize parameters to be impossible
-    lag_up = 10.0 * tau0 * zp1
-    lag_low = 0 * tau0 * zp1
+    if zp1 is not None and tau0 is not None:
+        lag_up = 10.0 * tau0 * zp1
+        lag_low = 0 * tau0 * zp1
     for i in range(zydata.nlc - 1):
-        if p[4 + 5 * i] < 0.0 or p[5 + 5 * i] > 0.0:
-            prior2 += my_pos_inf
-            # print "1st -inf"
-            # return -np.inf
-        if llags[2 * i] > lag_up or llags[2 * i] < lag_low:
-            prior2 += my_pos_inf
-            # print "2st -inf"
-            # return -np.inf
+        # if baldwin:
+        #     if p[4 + 5 * i] < 0.0 or p[5 + 5 * i] > 0.0:
+        #         # prior2 += my_pos_inf
+        #         # print "1st -inf"
+        #         return -np.inf
+        # else: 
+        #     if p[4 + 5 * i] < 0.0 or p[5 + 5 * i] < 0.0:
+        #         # prior2 += my_pos_inf
+        #         # print "1st -inf"
+        #         return -np.inf
+
+        if zp1 is not None and tau0 is not None:
+            if llags[2 * i] > lag_up or llags[2 * i] < lag_low:
+                prior2 += my_pos_inf
+                # print "2st -inf"
+                # return -np.inf
     
     if laglimit is not None:
         if llags[0] > laglimit[0][1] or llags[0] < laglimit[0][0]:
@@ -1895,10 +1902,10 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
     # add logp of all the priors
 
         
-    if ratiohpd is not None:
-        prior = -0.5*(prior0*prior0+prior1*prior1) - prior2 -\
-                (np.log10(p[4]) - np.log10(ratiohpd[1, 0]))**2.0 / (np.log10(2.0)) -\
-                (np.log10(p[5]) - np.log10(ratiohpd[1, 1]))**2.0 / (np.log10(2.0))
+    # if ratiohpd is not None:
+    #     prior = -0.5*(prior0*prior0+prior1*prior1) - prior2 -\
+    #             (np.log10(p[4]) - np.log10(ratiohpd[1, 0]))**2.0 / (np.log10(2.0)) -\
+    #             (np.log10(p[5]) - np.log10(ratiohpd[1, 1]))**2.0 / (np.log10(2.0))
 
     else:
         prior = -0.5*(prior0*prior0+prior1*prior1) - prior2
@@ -2156,6 +2163,17 @@ class Pmap_Model(object):
                     self.texs.append("_".join([r"$\alpha$", linename[i]]))
             else:
                 self.ndim = 4 * self.nlc - 2
+                for i in range(len(linename)):
+                    self.vars.append("_".join(["lag", linename[i]]))
+                    self.vars.append("_".join(["wid", linename[i]]))
+                    self.vars.append("_".join(["scale", linename[i]]))
+                    self.texs.append("".join([r"$lag_{", linename[i], r"}$"]))
+                    self.texs.append("".join([r"$wid_{", linename[i], r"}$"]))
+                    self.texs.append("".join([r"$scale_{", linename[i], r"}$"]))
+                    self.vars.append("alpha_%s" %linename[i])
+                    self.texs.append("_".join([r"$\alpha$", linename[i]]))
+
+
                 if self.hascontlag:
                     self.ndim = 6 * self.nlc - 2
                     self.vars.append("cont_lag_%s" %linename[i])

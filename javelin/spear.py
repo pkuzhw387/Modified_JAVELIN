@@ -29,7 +29,11 @@ def spear_threading(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,sym
         raise ValueError, 'The amp and scale parameters must be positive.'
     if (symm is None) :
         symm = (x is y) and (idx is idy)
-    scale_hidden = np.array([scales[2 * k] for k in range(1, (len(scales) - 1) / 2 + 1)])
+    if baldwin == False:
+        scale_hidden = [1.0]
+        for k in range(1, (len(scales) - 1) / 2 + 1):
+            scale_hidden.append(scales[2 * k])
+        scale_hidden = np.array(scale_hidden)
 
     x = regularize_array(x)
     y = regularize_array(y)
@@ -50,12 +54,20 @@ def spear_threading(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,sym
             bounds = np.array(np.sqrt(np.linspace(0,ny*ny,n_threads+1)),dtype=int)
     # Allocate the matrix
     C = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
-    if set_pmap :
-        def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-            SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,cmin,cmax,symm)
-    else :
-        def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-            SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,cmin,cmax,symm)
+    if baldwin:
+        if set_pmap :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,cmin,cmax,symm)
+        else :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,cmin,cmax,symm)
+    else:
+        if set_pmap :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,cmin,cmax,symm)
+        else :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,cmin,cmax,symm)
     if n_threads <= 1 :
         targ(C,x,y,idx,idy,0,-1,symm)
     else :
@@ -84,8 +96,24 @@ def spear(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set
     # lags = np.array([0.0, 15.0, 0.0])
     # wids = np.array([0.0, 2.0, 0.0])
     # scales = np.array([1.0, 0.05, 0.9])
+    # 
+    # if baldwin is True, the scales are [[scale1_t0, scale1_t1,...], [scale2_t0,..], ...]
+    # and the scale_hidden is [1.0, scale_hidden1, scale_hidden2, ...]
+    # 
+    # if baldwin is False, the scales are [1.0, scale1, scale_hidden1, scale2, scale_hidden2, ...]
+    # and the scale_hidden is [1.0, scale_hidden1, scale_hidden2, ...]
     if baldwin == False:
-        scale_hidden = np.array([scales[2 * k] for k in range(1, (len(scales) - 1) / 2 + 1)])
+        scale_hidden = [1.0]
+        for k in range(1, (len(scales) - 1) / 2 + 1):
+            scale_hidden.append(scales[2 * k])
+        scale_hidden = np.array(scale_hidden)
+
+        # print "scales: ", scales
+        # print "lags: ", lags
+        # print "wids: ", wids
+        # print "scale_hidden: ", scale_hidden
+        # hahaha = raw_input("just for pause.")
+
     else:
         # print "scale_hidden: ", scale_hidden
         # print "scales: ", scales
@@ -113,10 +141,11 @@ def spear(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set
     C = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
     C_single = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
     if set_pmap :
-        if baldwin == True:
+        if baldwin:
             SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,0,-1,symm)
         else:
             SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,0,-1,symm)
+            # SCF.covmatpmap_bit_orig(C,x,y,idx,idy,sigma,tau,lags,wids,scales,0,-1,symm)
     else :
         SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,0,-1,symm)
     if symm:
@@ -149,7 +178,11 @@ def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm
     if np.isscalar(idy) :
         idy = np.ones(nx, dtype="int", order="F")*idy
 
-    scale_hidden = np.array([scales[2 * k] for k in range(1, (len(scales) - 1) / 2 + 1)])
+    if baldwin == False:
+        scale_hidden = [1.0]
+        for k in range(1, (len(scales) - 1) / 2 + 1):
+            scale_hidden.append(scales[2 * k])
+        scale_hidden = np.array(scale_hidden)
 
     # Figure out how to divide job up between threads (along y)
     n_threads = min(get_threadpool_size(), nx*ny/blocksize)
@@ -162,12 +195,22 @@ def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm
             bounds = np.array(np.sqrt(np.linspace(0,ny*ny,n_threads+1)),dtype=int)
     # Allocate the matrix
     C = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
-    if set_pmap :
-        def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-            SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,cmin,cmax,symm)
-    else :
-        def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-            SCF.covmat_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,cmin,cmax,symm)
+    
+    if baldwin:
+        if set_pmap :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,cmin,cmax,symm)
+        else :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmat_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,cmin,cmax,symm)
+
+    else:
+        if set_pmap :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,cmin,cmax,symm)
+        else :
+            def targ(C,x,y,idx,idy,cmin,cmax,symm) :
+                SCF.covmat_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,cmin,cmax,symm)
     if n_threads <= 1 :
         targ(C,x,y,idx,idy,0,-1,symm)
     else :
@@ -197,7 +240,11 @@ def spear2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm=None,set_
     if np.isscalar(idy) :
         idy = np.ones(nx, dtype="int", order="F")*idy
     
-    scale_hidden = np.array([scales[2 * k] for k in range(1, (len(scales) - 1) / 2 + 1)])
+    if baldwin == False:
+        scale_hidden = [1.0]
+        for k in range(1, (len(scales) - 1) / 2 + 1):
+            scale_hidden.append(scales[2 * k])
+        scale_hidden = np.array(scale_hidden)
 
     # Allocate the matrix
     C = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
@@ -273,7 +320,7 @@ if __name__ == "__main__":
     slagarr = np.array([0.0, 10.0, 0.0])
     swidarr = np.array([0.0, 2.0, 0.0])
     scalearr = np.array([1.0, 0.05, 0.89])
-    scale_hidden = np.array([0.89])
+    scale_hidden = np.array([1.0, 0.89])
     sigma = 0.15
     tau = 20.0
     C = np.asmatrix(np.empty((npt,npt),dtype=float,order='F'))
@@ -285,14 +332,14 @@ if __name__ == "__main__":
 
 
     print "indices are: ", id1
-    # python covmatpmap result
-    py_SCF.covmatpmap_bit(C, jd1, jd2, id1, id2, sigma, tau, slagarr, swidarr, scalearr,len(jd1),len(jd2),\
-                          0, -1, True)
-    print "the result of the python code is:\n ", C
+    SCF.covmatpmap_bit_orig(C, jd1, jd2, id1, id2, sigma, tau, slagarr, swidarr, scalearr, 0, -1, True)
+    isotropic_cov_funs.symmetrize(C)
+
+    print "the result of the original code is:\n ", C
     C = np.asmatrix(np.empty((npt,npt),dtype=float,order='F'))
     print "scalearr: ", scalearr
-    f_SCF.covmatpmap_bit(C, jd1, jd2, id1, id2, sigma, tau, slagarr, swidarr, scalearr,scale_hidden,1,\
+    SCF.covmatpmap_bit(C, jd1, jd2, id1, id2, sigma, tau, slagarr, swidarr, scalearr,scale_hidden,1,\
                           0, -1, True)
     isotropic_cov_funs.symmetrize(C)
-    print "the result of the fortran code is:\n ", C
+    print "the result of the modified code is:\n ", C
 
