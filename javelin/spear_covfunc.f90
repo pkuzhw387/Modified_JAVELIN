@@ -62,7 +62,7 @@ END SUBROUTINE covmat_bit
 
 
 SUBROUTINE covmatpmap_bit(mat,jd1,jd2,id1,id2,sigma,tau,slagarr,swidarr,scalearr,&
-scale_hidden,model,nx,ny,ncurve,nline,cmin,cmax,symm)
+scale_hidden,model,transfunc,nx,ny,ncurve,nline,cmin,cmax,symm)
 implicit none
 !f2py intent(inplace) mat
 !f2py intent(in) jd1,jd2,id1,id2
@@ -72,7 +72,7 @@ implicit none
 !f2py integer intent(in), optional :: cmax=-1
 !f2py intent(in) 
 !f2py threadsafe
-INTEGER(kind=4)  :: nx,ny,ncurve,nline,cmin,cmax,model
+INTEGER(kind=4)  :: nx,ny,ncurve,nline,cmin,cmax,model,transfunc
 REAL(kind=8), DIMENSION(nx,ny) :: mat
 REAL(kind=8), DIMENSION(nx) :: jd1
 REAL(kind=8), DIMENSION(ny) :: jd2
@@ -125,11 +125,11 @@ if (symm) then
             if (model .eq. 1) then
                 call covmatpmapij(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             elseif (model .eq. 2) then
                 call covmatpmapij2(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             endif
         enddo
     enddo
@@ -158,11 +158,11 @@ else
             if (model .eq. 1) then
                 call covmatpmapij(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             elseif (model .eq. 2) then
                 call covmatpmapij2(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             endif
         enddo
     enddo
@@ -172,7 +172,7 @@ END SUBROUTINE covmatpmap_bit
 
 
 SUBROUTINE covmatpmap_bit_baldwin(mat,jd1,jd2,id1,id2,sigma,tau,slagarr,swidarr,scalearr,&
-scale_hidden,model,nx,ny,ncurve,nline,nepoch,cmin,cmax,symm)
+scale_hidden,model,transfunc,nx,ny,ncurve,nline,nepoch,cmin,cmax,symm)
 implicit none
 !f2py intent(inplace) mat
 !f2py intent(in) jd1,jd2,id1,id2
@@ -182,7 +182,7 @@ implicit none
 !f2py integer intent(in), optional :: cmax=-1
 !f2py intent(in) 
 !f2py threadsafe
-INTEGER(kind=4)  :: nx,ny,ncurve,nline,nepoch,cmin,cmax,model
+INTEGER(kind=4)  :: nx,ny,ncurve,nline,nepoch,cmin,cmax,model,transfunc
 REAL(kind=8), DIMENSION(nx,ny) :: mat
 REAL(kind=8), DIMENSION(nx) :: jd1
 REAL(kind=8), DIMENSION(ny) :: jd2
@@ -236,11 +236,11 @@ if (symm) then
             if (model .eq. 1) then
                 call covmatpmapij(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             elseif (model .eq. 2) then
                 call covmatpmapij2(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             endif
         enddo
     enddo
@@ -269,11 +269,11 @@ else
             if (model .eq. 1) then
                 call covmatpmapij(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             elseif (model .eq. 2) then
                 call covmatpmapij2(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),&
                     sigma,tau,slag1,swid1,scale1,&
-                    &slag2,swid2,scale2,scale_hidden,nlines)
+                    &slag2,swid2,scale2,scale_hidden,nlines,transfunc)
             endif
         enddo
     enddo
@@ -440,7 +440,7 @@ END SUBROUTINE covmatij
 ! pmap version of covmatij, now allows more than two light curves.
 !covmatpmapij(mat(i,j), id1(i),id2(j),jd1(i),jd2(j),sigma,tau,slag1,swid1,scale1,slag2,swid2,scale2,scale_hidden)
 SUBROUTINE covmatpmapij(covij,id1,id2,jd1,jd2,sigma,tau,slag1,swid1,scale1,&
-slag2,swid2,scale2,scale_hidden,nlines)
+slag2,swid2,scale2,scale_hidden,nlines,transfunc)
 implicit none
 REAL(kind=8),intent(out) :: covij
 INTEGER(kind=4),intent(in) :: id1,id2
@@ -449,7 +449,7 @@ REAL(kind=8),intent(in)  :: sigma,tau
 REAL(kind=8),intent(in)  :: slag1,swid1,scale1,slag2,swid2,scale2
 REAL(kind=8) :: twidth,twidth1,twidth2
 REAL(kind=8) :: tgap,tgap1,tgap2
-INTEGER(kind=4) :: imax,imin,nlines
+INTEGER(kind=4) :: imax,imin,nlines,transfunc
 REAL(kind=8), DIMENSION(nlines) :: scale_hidden
 
 imax = max(id1,id2)
@@ -462,84 +462,123 @@ if (imin .le. 0) then
     return
 endif
 
-! the following is the delta transfer function version.
-
-if (imin .eq. 1) then
-    if (imax .eq. 1) then
-        ! id1 = id2 = 1
-        ! continuum auto correlation
-        covij = getcmat_delta_DRW(id1, id2, jd1, jd2, tau, slag1, scale1, slag2, scale2)
-        ! print*,covij
-    else
-        
-        ! between two epochs of continuum and one of the lines
-        if ((id1 .eq. 1) .and. (id2 .ge. 2)) then
-            ! print*,scale_hidden(id2 - 1), id1, id2, scale1, scale2
-            covij = getcmat_delta_DRW(id1, id2, jd1, jd2, tau, 0.0D0, 1.0D0, 0.0D0, scale_hidden(id2))
+if (transfunc .eq. 1) then
+! Delta transfer function
+    if (imin .eq. 1) then
+        if (imax .eq. 1) then
+            ! id1 = id2 = 1
+            ! continuum auto correlation
+            covij = exp(-abs(jd1 - jd2) / tau)
             ! print*,covij
-        elseif ((id2 .eq. 1) .and. (id1 .ge. 2)) then
-!             print*,scale_hidden(id1 - 1), id1, id2, scale1, scale2
-            covij = getcmat_delta_DRW(id1, id2, jd1, jd2, tau, 0.0D0, scale_hidden(id1), 0.0D0, 1.0D0)
-            ! print*,covij
+        else
+            covij = scale_hidden(imax) * exp(-abs(jd1 - jd2) / tau)
+            ! between two epochs of continuum and one of the lines
+            if ((id1 .eq. 1) .and. (id2 .ge. 2)) then
+                ! print*,scale_hidden(id2 - 1), id1, id2, scale1, scale2
+                covij = covij + scale2 * exp(-abs(jd1 - jd2 + slag2) / tau)
+                ! print*,covij
+            elseif ((id2 .eq. 1) .and. (id1 .ge. 2)) then
+    !             print*,scale_hidden(id1 - 1), id1, id2, scale1, scale2
+                covij = covij + scale1 * exp(-abs(jd2 - jd1 + slag1) / tau)
+                ! print*,covij
+            endif
         endif
-        twidth = max(swid1, swid2)
-        if (twidth .le. 0.01D0) then
-            covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, tau, slag1, scale1, slag2, scale2)
+
+    else
+    !     print*, slag1, slag2
+        ! id1, id2 >= 2
+        ! line band cross correlation: cov(cmi,cnj) + cov(cmi,lnj) + cov(lmi,cnj) + cov(lmi,lnj)
+        covij = scale_hidden(id1) * scale_hidden(id2) * exp(-abs(jd1 - jd2) / tau) +&
+                scale_hidden(id1) * scale2 * exp(-abs(jd1 - jd2 + slag2) / tau) +&
+                scale_hidden(id2) * scale1 * exp(-abs(jd1 - jd2 - slag1) / tau) +&
+                scale1 * scale2 * exp(-abs(jd1 - jd2 - slag1 + slag2) / tau)
+    endif
+
+elseif (transfunc .eq. 2) then
+!     top-hat transfer function
+    if (imin .eq. 1) then
+        if (imax .eq. 1) then
+            ! id1 = id2 = 1
+            ! continuum auto correlation
+            covij = getcmat_delta_DRW(id1, id2, jd1, jd2, tau, slag1, scale1, slag2, scale2)
+            ! print*,covij
+        else
+            
+            ! between two epochs of continuum and one of the lines
+            if ((id1 .eq. 1) .and. (id2 .ge. 2)) then
+                ! print*,scale_hidden(id2 - 1), id1, id2, scale1, scale2
+                covij = getcmat_delta_DRW(id1, id2, jd1, jd2, tau, 0.0D0, 1.0D0, 0.0D0, scale_hidden(id2))
+                ! print*,covij
+            elseif ((id2 .eq. 1) .and. (id1 .ge. 2)) then
+    !             print*,scale_hidden(id1 - 1), id1, id2, scale1, scale2
+                covij = getcmat_delta_DRW(id1, id2, jd1, jd2, tau, 0.0D0, scale_hidden(id1), 0.0D0, 1.0D0)
+                ! print*,covij
+            endif
+            twidth = max(swid1, swid2)
+            if (twidth .le. 0.01D0) then
+                covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, tau, slag1, scale1, slag2, scale2)
+            else
+                covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, &
+                        tau, slag1, swid1, scale1, slag2, swid2, scale2)
+            endif
+
+
+        endif
+
+    else
+    !     print*, slag1, slag2
+        ! id1, id2 >= 2
+        ! line band cross correlation: cov(cmi,cnj) + cov(cmi,lnj) + cov(lmi,cnj) + cov(lmi,lnj)
+        covij = getcmat_delta_DRW(id1, id2, jd1, jd2, &
+                tau, 0.0D0, scale_hidden(id1), 0.0D0, scale_hidden(id2))
+
+
+        if (swid2 .le. 0.01D0) then
+            covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, &
+                    tau, 0.0D0, scale_hidden(id1), slag2, scale2)
+        else
+            covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, &
+                    tau, 0.0D0, 0.0D0, scale_hidden(id1), slag2, swid2, scale2) 
+        endif
+
+
+
+        if (swid1 .le. 0.01D0) then
+            covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, &
+                    tau, slag1, scale1, 0.0D0, scale_hidden(id2))
+        else
+            covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, tau, &
+                    slag1, swid1, scale1, 0.0D0, 0.0D0, scale_hidden(id2))
+        endif
+
+
+
+        if ((swid1 .le. 0.01D0) .and. (swid2 .le. 0.01D0)) then
+            covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, &
+                    tau, slag1, scale1, slag2, scale2)
+
+        elseif ((swid1 .ge. 0.01D0) .and. (swid2 .ge. 0.01D0)) then
+            if (id1 .eq. id2) then
+                covij = covij + getcmat_lauto_DRW(id1, jd1, jd2, &
+                        tau, slag1, swid1, scale1)
+            else
+                covij = covij + getcmat_lcross_DRW(id1, id2, jd1, jd2, &
+                        tau, slag1, swid1, scale1, slag2, swid2, scale2)
+            endif
+
         else
             covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, &
                     tau, slag1, swid1, scale1, slag2, swid2, scale2)
         endif
 
-
     endif
-
-else
-!     print*, slag1, slag2
-    ! id1, id2 >= 2
-    ! line band cross correlation: cov(cmi,cnj) + cov(cmi,lnj) + cov(lmi,cnj) + cov(lmi,lnj)
-    covij = getcmat_delta_DRW(id1, id2, jd1, jd2, &
-            tau, 0.0D0, scale_hidden(id1), 0.0D0, scale_hidden(id2))
-
-
-    if (swid2 .le. 0.01D0) then
-        covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, &
-                tau, 0.0D0, scale_hidden(id1), slag2, scale2)
-    else
-        covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, &
-                tau, 0.0D0, 0.0D0, scale_hidden(id1), slag2, swid2, scale2) 
-    endif
-
-
-
-    if (swid1 .le. 0.01D0) then
-        covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, &
-                tau, slag1, scale1, 0.0D0, scale_hidden(id2))
-    else
-        covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, tau, &
-                slag1, swid1, scale1, 0.0D0, 0.0D0, scale_hidden(id2))
-    endif
-
-
-
-    if ((swid1 .le. 0.01D0) .and. (swid2 .le. 0.01D0)) then
-        covij = covij + getcmat_delta_DRW(id1, id2, jd1, jd2, &
-                tau, slag1, scale1, slag2, scale2)
-
-    elseif ((swid1 .ge. 0.01D0) .and. (swid2 .ge. 0.01D0)) then
-        if (id1 .eq. id2) then
-            covij = covij + getcmat_lauto_DRW(id1, jd1, jd2, &
-                    tau, slag1, swid1, scale1)
-        else
-            covij = covij + getcmat_lcross_DRW(id1, id2, jd1, jd2, &
-                    tau, slag1, swid1, scale1, slag2, swid2, scale2)
-        endif
-
-    else
-        covij = covij + getcmat_lc_DRW(id1, id2, jd1, jd2, &
-                tau, slag1, swid1, scale1, slag2, swid2, scale2)
-    endif
-
+elseif (transfunc .eq. 3) then
+!     Gaussian tranfer function
+    print*, "Not implemented yet!"
+    covij = -1.0D0
+    return
 endif
+
 ! print*, covij
 covij = 0.5D0*sigma*sigma*covij
 return
@@ -549,7 +588,7 @@ END SUBROUTINE covmatpmapij
 
 
 SUBROUTINE covmatpmapij2(covij,id1,id2,jd1,jd2,A,gama,slag1,swid1,scale1,&
-slag2,swid2,scale2,scale_hidden,nlines)
+slag2,swid2,scale2,scale_hidden,nlines,transfunc)
 implicit none
 REAL(kind=8),intent(out) :: covij
 INTEGER(kind=4),intent(in) :: id1,id2
@@ -559,7 +598,7 @@ REAL(kind=8),intent(in)  :: slag1,swid1,scale1,slag2,swid2,scale2
 ! index 1 and 2 correspond to id1 and id2.
 REAL(kind=8) :: twidth,twidth1,twidth2
 REAL(kind=8) :: tgap,tgap1,tgap2
-INTEGER(kind=4) :: imax,imin,nlines
+INTEGER(kind=4) :: imax,imin,nlines,transfunc
 REAL(kind=8), DIMENSION(nlines) :: scale_hidden
 
 
@@ -574,83 +613,119 @@ if (imin .le. 0) then
 endif
 
 
+if (transfunc .eq. 1) then
+    if (imin .eq. 1) then
+        if (imax .eq. 1) then
+            ! id1 = id2 = 1
+            ! continuum auto correlation
+            covij = (10.0D0)**gama - 0.5D0 * (abs(jd1 - jd2) / 365.25D0)**gama
 
-if (imin .eq. 1) then
-    if (imax .eq. 1) then
-        ! id1 = id2 = 1
-        ! continuum auto correlation
-        covij = getcmat_delta_PL(id1, id2, jd1, jd2, gama, slag1, scale1, slag2, scale2)
-        ! print*,covij
-    else
-        
-        ! between two epochs of continuum and one of the lines
-        if ((id1 .eq. 1) .and. (id2 .ge. 2)) then
-            ! print*,scale_hidden(id2 - 1), id1, id2, scale1, scale2
-            covij = getcmat_delta_PL(id1, id2, jd1, jd2, gama, 0.0D0, 1.0D0, 0.0D0, scale_hidden(id2))
-            ! print*,covij
-        elseif ((id2 .eq. 1) .and. (id1 .ge. 2)) then
-!             print*,scale_hidden(id1 - 1), id1, id2, scale1, scale2
-            covij = getcmat_delta_PL(id1, id2, jd1, jd2, gama, 0.0D0, scale_hidden(id1), 0.0D0, 1.0D0)
-            ! print*,covij
+        else
+            ! between two epochs of continuum and one of the lines
+
+            if ((id1 .eq. 1) .and. (id2 .ge. 2)) then
+                covij = scale_hidden(id2) * ((10.0D0)**gama - 0.5D0 * (abs(jd1 - jd2) / 365.25D0)**gama) +&
+                        scale2 * ((10.0D0)**gama-(abs(jd1 - jd2 + slag2) / 365.25D0)**gama)
+            elseif ((id2 .eq. 1) .and. (id1 .ge. 2)) then
+                covij = scale_hidden(id1) * ((10.0D0)**gama - 0.5D0 * (abs(jd2 - jd1) / 365.25D0)**gama) +&
+                        scale1 * ((10.0D0)**gama-(abs(jd2 - jd1 + slag1) / 365.25D0)**gama)
+            endif
         endif
-        twidth = max(swid1, swid2)
-        if (twidth .le. 0.01D0) then
-            covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, gama, slag1, scale1, slag2, scale2)
+    else
+        ! id1, id2 >= 2
+        ! line band cross correlation: cov(cmi,cnj) + cov(cmi,lnj) + cov(lmi,cnj) + cov(lmi,lnj)
+        covij = scale_hidden(id1) * scale_hidden(id2) * ((10.0D0)**gama - 0.5D0 * (abs(jd1 - jd2) / 365.25D0)**gama) +&
+                scale_hidden(id1) * scale2 * ((10.0D0)**gama-(abs(jd1 - jd2 + slag2) / 365.25D0)**gama) +&
+                scale_hidden(id2) * scale1 * ((10.0D0)**gama-(abs(jd2 - jd1 + slag1) / 365.25D0)**gama) +&
+                scale1 * scale2 * ((10.0D0)**gama-(abs(jd2 - jd1 + slag1 - slag2) / 365.25D0)**gama)
+
+    endif
+
+elseif (transfunc .eq. 2) then
+!     top-hat transfer function
+    if (imin .eq. 1) then
+        if (imax .eq. 1) then
+            ! id1 = id2 = 1
+            ! continuum auto correlation
+            covij = getcmat_delta_PL(id1, id2, jd1, jd2, gama, slag1, scale1, slag2, scale2)
+            ! print*,covij
+        else
+            
+            ! between two epochs of continuum and one of the lines
+            if ((id1 .eq. 1) .and. (id2 .ge. 2)) then
+                ! print*,scale_hidden(id2 - 1), id1, id2, scale1, scale2
+                covij = getcmat_delta_PL(id1, id2, jd1, jd2, gama, 0.0D0, 1.0D0, 0.0D0, scale_hidden(id2))
+                ! print*,covij
+            elseif ((id2 .eq. 1) .and. (id1 .ge. 2)) then
+    !             print*,scale_hidden(id1 - 1), id1, id2, scale1, scale2
+                covij = getcmat_delta_PL(id1, id2, jd1, jd2, gama, 0.0D0, scale_hidden(id1), 0.0D0, 1.0D0)
+                ! print*,covij
+            endif
+            twidth = max(swid1, swid2)
+            if (twidth .le. 0.01D0) then
+                covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, gama, slag1, scale1, slag2, scale2)
+            else
+                covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, &
+                        gama, slag1, swid1, scale1, slag2, swid2, scale2)
+            endif
+
+
+        endif
+
+    else
+    !     print*, slag1, slag2
+        ! id1, id2 >= 2
+        ! line band cross correlation: cov(cmi,cnj) + cov(cmi,lnj) + cov(lmi,cnj) + cov(lmi,lnj)
+        covij = getcmat_delta_PL(id1, id2, jd1, jd2, &
+                gama, 0.0D0, scale_hidden(id1), 0.0D0, scale_hidden(id2))
+
+
+        if (swid2 .le. 0.01D0) then
+            covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, &
+                    gama, 0.0D0, scale_hidden(id1), slag2, scale2)
+        else
+            covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, &
+                    gama, 0.0D0, 0.0D0, scale_hidden(id1), slag2, swid2, scale2) 
+        endif
+
+
+
+        if (swid1 .le. 0.01D0) then
+            covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, &
+                    gama, slag1, scale1, 0.0D0, scale_hidden(id2))
+        else
+            covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, gama, &
+                    slag1, swid1, scale1, 0.0D0, 0.0D0, scale_hidden(id2))
+        endif
+
+
+
+        if ((swid1 .le. 0.01D0) .and. (swid2 .le. 0.01D0)) then
+            covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, &
+                    gama, slag1, scale1, slag2, scale2)
+
+        elseif ((swid1 .ge. 0.01D0) .and. (swid2 .ge. 0.01D0)) then
+            if (id1 .eq. id2) then
+                covij = covij + getcmat_lauto_PL(id1, jd1, jd2, &
+                        gama, slag1, swid1, scale1)
+            else
+                covij = covij + getcmat_lcross_PL(id1, id2, jd1, jd2, &
+                        gama, slag1, swid1, scale1, slag2, swid2, scale2)
+            endif
+
         else
             covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, &
                     gama, slag1, swid1, scale1, slag2, swid2, scale2)
         endif
-
-
     endif
 
-else
-!     print*, slag1, slag2
-    ! id1, id2 >= 2
-    ! line band cross correlation: cov(cmi,cnj) + cov(cmi,lnj) + cov(lmi,cnj) + cov(lmi,lnj)
-    covij = getcmat_delta_PL(id1, id2, jd1, jd2, &
-            gama, 0.0D0, scale_hidden(id1), 0.0D0, scale_hidden(id2))
+elseif (transfunc .eq. 3) then
+!     Gaussian transfer function
+    print*, "Not implemented yet!"
+    covij = -1.0D0
+    return
 
-
-    if (swid2 .le. 0.01D0) then
-        covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, &
-                gama, 0.0D0, scale_hidden(id1), slag2, scale2)
-    else
-        covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, &
-                gama, 0.0D0, 0.0D0, scale_hidden(id1), slag2, swid2, scale2) 
-    endif
-
-
-
-    if (swid1 .le. 0.01D0) then
-        covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, &
-                gama, slag1, scale1, 0.0D0, scale_hidden(id2))
-    else
-        covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, gama, &
-                slag1, swid1, scale1, 0.0D0, 0.0D0, scale_hidden(id2))
-    endif
-
-
-
-    if ((swid1 .le. 0.01D0) .and. (swid2 .le. 0.01D0)) then
-        covij = covij + getcmat_delta_PL(id1, id2, jd1, jd2, &
-                gama, slag1, scale1, slag2, scale2)
-
-    elseif ((swid1 .ge. 0.01D0) .and. (swid2 .ge. 0.01D0)) then
-        if (id1 .eq. id2) then
-            covij = covij + getcmat_lauto_PL(id1, jd1, jd2, &
-                    gama, slag1, swid1, scale1)
-        else
-            covij = covij + getcmat_lcross_PL(id1, id2, jd1, jd2, &
-                    gama, slag1, swid1, scale1, slag2, swid2, scale2)
-        endif
-
-    else
-        covij = covij + getcmat_lc_PL(id1, id2, jd1, jd2, &
-                gama, slag1, swid1, scale1, slag2, swid2, scale2)
-    endif
 endif
-
 
 covij = A*A*covij
 !print*, A, gama, covij

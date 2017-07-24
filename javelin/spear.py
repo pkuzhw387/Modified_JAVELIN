@@ -17,7 +17,7 @@ import unittest
 """
 
 
-def spear_threading(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,blocksize=10000,baldwin=False) :
+def spear_threading(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,blocksize=10000,baldwin=False,transfunc=2) :
     """
     threaded version, divide matrix into subblocks with *blocksize*
     elements each. Do not use it when multiprocessing is on (e.g., in emcee MCMC
@@ -57,14 +57,14 @@ def spear_threading(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,sym
     if baldwin:
         if set_pmap :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-                SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,cmin,cmax,symm)
+                SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,transfunc,cmin,cmax,symm)
         else :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
                 SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,cmin,cmax,symm)
     else:
         if set_pmap :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-                SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,cmin,cmax,symm)
+                SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,transfunc,cmin,cmax,symm)
         else :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
                 SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,cmin,cmax,symm)
@@ -79,7 +79,7 @@ def spear_threading(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,sym
     return(C)
 
 
-def spear(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,baldwin=False) :
+def spear(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,baldwin=False,transfunc=2) :
     """ Clean version without multithreading. Used when multiprocessing is on
     (e.g., in emcee MCMC sampling).
 
@@ -142,9 +142,9 @@ def spear(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set
     C_single = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
     if set_pmap :
         if baldwin:
-            SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,0,-1,symm)
+            SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,transfunc,0,-1,symm)
         else:
-            SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,0,-1,symm)
+            SCF.covmatpmap_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden,1,transfunc,0,-1,symm)
             # SCF.covmatpmap_bit_orig(C,x,y,idx,idy,sigma,tau,lags,wids,scales,0,-1,symm)
     else :
         SCF.covmat_bit(C,x,y,idx,idy,sigma,tau,lags,wids,scales,0,-1,symm)
@@ -157,7 +157,7 @@ def spear(x,y,idx,idy,sigma,tau,lags,wids,scales,scale_hidden=None,symm=None,set
 
 
 
-def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,blocksize=10000,baldwin=False) :
+def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,blocksize=10000,baldwin=False,transfunc=2) :
     """
     threaded version, divide matrix into subblocks with *blocksize*
     elements each. Do not use it when multiprocessing is on (e.g., in emcee MCMC
@@ -199,7 +199,7 @@ def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm
     if baldwin:
         if set_pmap :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-                SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,cmin,cmax,symm)
+                SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,transfunc,cmin,cmax,symm)
         else :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
                 SCF.covmat_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,cmin,cmax,symm)
@@ -207,7 +207,7 @@ def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm
     else:
         if set_pmap :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
-                SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,cmin,cmax,symm)
+                SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,transfunc,cmin,cmax,symm)
         else :
             def targ(C,x,y,idx,idy,cmin,cmax,symm) :
                 SCF.covmat_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,cmin,cmax,symm)
@@ -221,7 +221,7 @@ def spear_threading2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm
     return(C)
 
 
-def spear2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,baldwin=False) :
+def spear2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm=None,set_pmap=False,baldwin=False,transfunc=2) :
     """ Clean version without multithreading. Used when multiprocessing is on
     (e.g., in emcee MCMC sampling).
 
@@ -250,9 +250,9 @@ def spear2(x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden=None,symm=None,set_
     C = np.asmatrix(np.empty((nx,ny),dtype=float,order='F'))
     if set_pmap :
         if baldwin == True:
-            SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,0,-1,symm)
+            SCF.covmatpmap_bit_baldwin(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,transfunc,0,-1,symm)
         else:
-            SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,0,-1,symm)
+            SCF.covmatpmap_bit(C,x,y,idx,idy,A,gamma,lags,wids,scales,scale_hidden,2,transfunc,0,-1,symm)
     else :
         SCF.covmat_bit2(C,x,y,idx,idy,A,gamma,lags,wids,scales,0,-1,symm)
     if symm:

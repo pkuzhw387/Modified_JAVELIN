@@ -41,6 +41,8 @@ lognu_ceiling = np.log(nu_ceiling)
 __all__ = ['Cont_Model', 'Rmap_Model', 'Pmap_Model', 'SPmap_Model',
            'SCmap_Model']
 
+transfunc_dict = {'delta': 1, 'top-hat': 2, 'gaussian': 3}
+
 
 def _lnlike_from_U(U, zydata, set_retq=False, set_verbose=False):
     """ Calculate the log-likelihoods from the upper triangle of cholesky
@@ -1651,7 +1653,7 @@ def unpackphotopar(p, zydata=None, nlc=2, hascontlag=False, GPmodel="DRW", baldw
 def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, ratiohpd=None, set_extraprior=False,
                      lagtobaseline=0.3, laglimit=None, widtobaseline=0.2,
                      widlimit=None, set_threading=False, blocksize=10000,
-                     set_retq=False, set_verbose=False, lagpenaled=None, tau0=None, zp1=None, fixed=None, p_fix=None, baldwin=False):
+                     set_retq=False, set_verbose=False, lagpenaled=None, tau0=None, zp1=None, fixed=None, p_fix=None, baldwin=False, transfunc=2):
 	
 
     """ log-posterior function of p.
@@ -1741,33 +1743,33 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
             vals = list(lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, scale_hidden=scale_hidden,
                                     set_retq=True, set_verbose=set_verbose,
                                     set_threading=set_threading,
-                                    blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel, baldwin=baldwin))
+                                    blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel, baldwin=baldwin,transfunc=transfunc))
         else:
 
             logl = lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, scale_hidden=scale_hidden,
                                   set_retq=False, set_verbose=set_verbose,
-                                  set_threading=set_threading, blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel,baldwin=baldwin)
+                                  set_threading=set_threading, blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel,baldwin=baldwin,transfunc=transfunc)
     else:
         if GPmodel == "pow-law":
-            A, gamma, llags, lwids, lscales = unpackphotopar(p, zydata, zydata.nlc,hascontlag=hascontlag, GPmodel="pow-law", baldwin=False)
+            A, gamma, llags, lwids, lscales = unpackphotopar(p, zydata, zydata.nlc,hascontlag=hascontlag, GPmodel="pow-law", baldwin=baldwin)
             # this assignment is to facillitate the unification of lnlikefn_photo function,
             # so that I don't have to write lnlikefn_photo2 function.
             sigma = A
             tau = gamma
         elif GPmodel == "DRW":
-            sigma, tau, llags, lwids, lscales = unpackphotopar(p, zydata, zydata.nlc,hascontlag=hascontlag, GPmodel='DRW', baldwin=False)
+            sigma, tau, llags, lwids, lscales = unpackphotopar(p, zydata, zydata.nlc,hascontlag=hascontlag, GPmodel='DRW', baldwin=baldwin)
 
         if set_retq:
 
         	vals = list(lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales,scale_hidden=None,
                                    	set_retq=True, set_verbose=set_verbose,
                                    	set_threading=set_threading,
-                                   	blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel))
+                                   	blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel,baldwin=baldwin, transfunc=transfunc))
         else:
 
             logl = lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales,scale_hidden=None,
                                   set_retq=False, set_verbose=set_verbose,
-                                  set_threading=set_threading, blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel)
+                                  set_threading=set_threading, blocksize=blocksize, hascontlag=hascontlag, GPmodel=GPmodel, baldwin=baldwin, transfunc=transfunc)
 
 
     # conthpd is in natural log
@@ -1858,12 +1860,18 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
         #         # print "1st -inf"
         #         return -np.inf
 
+
+        if llags[2 * i] < 0.0:
+            return -np.inf
+
         if zp1 is not None and tau0 is not None:
             if llags[2 * i] > lag_up or llags[2 * i] < lag_low:
                 prior2 += my_pos_inf
                 # print "2st -inf"
                 # return -np.inf
     
+
+
     if laglimit is not None:
         if llags[0] > laglimit[0][1] or llags[0] < laglimit[0][0]:
             prior2 += my_pos_inf
@@ -1997,7 +2005,7 @@ def lnlikefn_EW(line_scale, cont_scale, filter_func=None):
 
 
 def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, scale_hidden, set_retq=False,
-                   set_verbose=False, set_threading=False, blocksize=10000, hascontlag=False, GPmodel='DRW', baldwin=False):
+                   set_verbose=False, set_threading=False, blocksize=10000, hascontlag=False, GPmodel='DRW', baldwin=False, transfunc=2):
     """ Log-likelihood function.
     """
     if zydata.issingle:
@@ -2051,22 +2059,22 @@ def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, scale_hidden, set_
             if GPmodel == 'DRW':
                 C = spear_threading(zydata.jarr, zydata.jarr, zydata.iarr,
                                     zydata.iarr, sigma, tau, lags, wids, scales,
-                                    set_pmap=True, blocksize=blocksize,baldwin=False)
+                                    set_pmap=True, blocksize=blocksize,baldwin=False,transfunc=transfunc)
             elif GPmodel == 'pow-law':
                 A = sigma
                 gamma = tau
                 C = spear_threading2(zydata.jarr, zydata.jarr, zydata.iarr,
                                     zydata.iarr, A, gamma, lags, wids, scales,
-                                    set_pmap=True, blocksize=blocksize,baldwin=False)
+                                    set_pmap=True, blocksize=blocksize,baldwin=False,transfunc=transfunc)
         else:
             if GPmodel == 'DRW':
                 C = spear(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, sigma,
-                        tau, lags, wids, scales, set_pmap=True,baldwin=False)
+                        tau, lags, wids, scales, set_pmap=True,baldwin=False,transfunc=transfunc)
             elif GPmodel =='pow-law':
                 A = sigma
                 gamma = tau
                 C = spear2(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, A,
-                        gamma, lags, wids, scales, set_pmap=True,baldwin=False)
+                        gamma, lags, wids, scales, set_pmap=True,baldwin=False,transfunc=transfunc)
 
     else:
         # when baldwin == True, scales is passed and used in spear*() as a copy of llags.
@@ -2075,22 +2083,22 @@ def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, scale_hidden, set_
             if GPmodel == 'DRW':
                 C = spear_threading(zydata.jarr, zydata.jarr, zydata.iarr,
                                     zydata.iarr, sigma, tau, lags, wids, scales,scale_hidden=scale_hidden,
-                                    set_pmap=True, blocksize=blocksize,baldwin=True)
+                                    set_pmap=True, blocksize=blocksize,baldwin=True,transfunc=transfunc)
             elif GPmodel == 'pow-law':
                 A = sigma
                 gamma = tau
                 C = spear_threading2(zydata.jarr, zydata.jarr, zydata.iarr,
                                     zydata.iarr, A, gamma, lags, wids, scales,scale_hidden=scale_hidden,
-                                    set_pmap=True, blocksize=blocksize,baldwin=True)
+                                    set_pmap=True, blocksize=blocksize,baldwin=True,transfunc=transfunc)
         else:
             if GPmodel == 'DRW':
                 C = spear(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, sigma,
-                        tau, lags, wids, scales,scale_hidden=scale_hidden, set_pmap=True,baldwin=True)
+                        tau, lags, wids, scales,scale_hidden=scale_hidden, set_pmap=True,baldwin=True,transfunc=transfunc)
             elif GPmodel =='pow-law':
                 A = sigma
                 gamma = tau
                 C = spear2(zydata.jarr, zydata.jarr, zydata.iarr, zydata.iarr, A,
-                        gamma, lags, wids, scales,scale_hidden=scale_hidden, set_pmap=True,baldwin=True)
+                        gamma, lags, wids, scales,scale_hidden=scale_hidden, set_pmap=True,baldwin=True,transfunc=transfunc)
 
     # decompose C inplace
     #print C
@@ -2108,7 +2116,7 @@ def lnlikefn_photo(zydata, sigma, tau, llags, lwids, lscales, scale_hidden, set_
 
 
 class Pmap_Model(object):
-    def __init__(self, GPmodel="DRW", zydata=None, linename="line", hascontlag=False, baldwin=False):
+    def __init__(self, GPmodel="DRW", zydata=None, linename="line", hascontlag=False, baldwin=False, transfunc='top-hat'):
         """ Pmap Model object.
 
         Parameters
@@ -2139,6 +2147,7 @@ class Pmap_Model(object):
             self.jend = zydata.jend
             self.names = zydata.names
             self.hascontlag=hascontlag
+            self.transfunc = transfunc_dict[transfunc]
             # When using the power-law model, we modify self.vars=["A", "gamma"] @ZHW
             if self.GPmodel == "DRW":
                 self.vars = ["sigma", "tau"]
@@ -2273,7 +2282,7 @@ class Pmap_Model(object):
                 laglimit="baseline", widtobaseline=0.2, widlimit="nyquist",
                 nwalkers=100, nburn=100, nchain=100, threads=1, fburn=None,
                 fchain=None, flogp=None, set_threading=False, blocksize=10000,
-                set_verbose=True, tau0=None, zp1=None, fixed=None, p_fix=None, baldwin=None):
+                set_verbose=True, tau0=None, zp1=None, fixed=None, p_fix=None, baldwin=None, transfunc=2):
         """ See `lnpostfn_photo_p` for doc, except for `laglimit` and `widlimit`,
         both of which have different default values ('baseline' / 'nyquist').
         'baseline' means the boundaries are naturally determined by the
@@ -2348,7 +2357,7 @@ class Pmap_Model(object):
                                   args=(self.zydata, self.GPmodel, self.hascontlag, conthpd, ratiohpd, set_extraprior,
                                         lagtobaseline, laglimit, widtobaseline,
                                         widlimit, set_threading, blocksize,
-                                        False, False, None, tau0, zp1, fixed, p_fix, baldwin), threads=threads)
+                                        False, False, None, tau0, zp1, fixed, p_fix, baldwin, self.transfunc), threads=threads)
         pos, prob, state = sampler.run_mcmc(p0, nburn)
         if set_verbose:
             print("burn-in finished")
