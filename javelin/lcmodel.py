@@ -1653,7 +1653,9 @@ def unpackphotopar(p, zydata=None, nlc=2, hascontlag=False, GPmodel="DRW", baldw
 def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, ratiohpd=None, set_extraprior=False,
                      lagtobaseline=0.3, laglimit=None, widtobaseline=0.2,
                      widlimit=None, set_threading=False, blocksize=10000,
-                     set_retq=False, set_verbose=False, lagpenaled=None, tau0=None, zp1=None, fixed=None, p_fix=None, baldwin=False, transfunc=2):
+                     set_retq=False, set_verbose=False, lagpenaled=None, \
+                     tau0=None, zp1=None, fixed=None, p_fix=None, \
+                     baldwin=False, transfunc=2,alphalimit=1.5):
 	
 
     """ log-posterior function of p.
@@ -1717,6 +1719,9 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
     # unpack the parameters from p
     # Add a scale param here.
     # print "set_threading is: ", set_threading
+    # 
+    
+
     
     if fixed is not None:
         # fix parameters during inference
@@ -1862,6 +1867,9 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
 
 
         if llags[2 * i] < 0.0:
+            return -np.inf
+
+        if p[5 + 5 * i] > 1.5 * np.mean(zydata.rlist[i + 1]):
             return -np.inf
 
         if zp1 is not None and tau0 is not None:

@@ -68,6 +68,8 @@ class LightCurve(object):
 
         # jlist/mlist/elist/ilist: list of j, m, e, i of each individual light curve 
         self.jlist, self.mlist, self.elist, self.ilist = self.sorteddatalist(self.zylclist)
+        # rlist: list of ratios of each line+cont band to the pure cont band light curve
+        self.rlist = [np.array(self.mlist[i]) / np.array(self.mlist[0]) for i in range(len(self.mlist))]
 
         # continuum properties, useful in determining continuum variability
         self.cont_mean     = np.mean(self.mlist[0])

@@ -580,7 +580,7 @@ elseif (transfunc .eq. 3) then
 endif
 
 ! print*, covij
-covij = 0.5D0*sigma*sigma*covij
+covij = sigma*sigma*covij
 return
 END SUBROUTINE covmatpmapij
 
