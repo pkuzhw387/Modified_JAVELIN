@@ -497,7 +497,7 @@ class LightCurve(object):
         p = jarr.argsort()
         return(jarr[p], marr[p], earr[p], iarr[p])
 
-def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type="flux", cont_frac=1.0):
+def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type="flux", rescale=1.0):
     """ Read light curve file(s) into a LightCurve object.
 
     Parameters
@@ -520,6 +520,9 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type
 
     line_fraction: float
         line fraction in the line band
+
+    rescale: float
+        rescale factor on all of the flux/mag data.
 
     Returns
     -------
@@ -562,7 +565,7 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type
                 if lcf == lcfile[0]:
                     cont_lc = lc[0]
                     cont_mean = np.mean(cont_lc)
-            elif dat_type = 'flux-to-mag':
+            elif dat_type == 'flux-to-mag':
                 warnings.warn("You have chosen to convert the input fluxes into magnitudes, so the line scales and alpha parameters are no longer physically meaningful.")
                 if lcf == lcfile[0]:
                     F0 = max(lc[0][1])
@@ -571,6 +574,11 @@ def get_data(lcfile, names=None, set_subtractmean=True, timeoffset=0.0, dat_type
                 lc[0][1] = [-2.5 * np.log(lc[0][1][i] / F0) for i in range(len(lc[0][1]))]
                 # flux error -> magnitude error
                 lc[0][2] = [2.5 / np.log(10) * ((err_0 * lc[0][1][i])**2 + (lc[0][2][i] * F0)**2)**0.5 / (lc[0][1][i] * F0) for i in range(len(lc[0][1]))]
+
+            # rescale the light curves.
+            lc[0][1] = [lc[0][1][i] * rescale for i in range(len(lc[0][1]))]
+            lc[0][2] = [lc[0][2][i] * rescale for i in range(len(lc[0][2]))]
+
 
             lclist.append(lc[0])
     for ilc in xrange(len(lclist)) :
