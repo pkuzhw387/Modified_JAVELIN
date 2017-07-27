@@ -1655,7 +1655,7 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
                      widlimit=None, set_threading=False, blocksize=10000,
                      set_retq=False, set_verbose=False, lagpenaled=None, \
                      tau0=None, zp1=None, fixed=None, p_fix=None, \
-                     baldwin=False, transfunc=2,alphalimit=1.5):
+                     baldwin=False, transfunc=2,alphalimit=None):
 	
 
     """ log-posterior function of p.
@@ -1869,7 +1869,7 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
         if llags[2 * i] < 0.0:
             return -np.inf
 
-        if p[5 + 5 * i] > 1.5 * np.mean(zydata.rlist[i + 1]):
+        if alphalimit is not None and p[5 + 5 * i] > alphalimit * np.mean(zydata.rlist[i + 1]):
             return -np.inf
 
         if zp1 is not None and tau0 is not None:
@@ -2290,7 +2290,8 @@ class Pmap_Model(object):
                 laglimit="baseline", widtobaseline=0.2, widlimit="nyquist",
                 nwalkers=100, nburn=100, nchain=100, threads=1, fburn=None,
                 fchain=None, flogp=None, set_threading=False, blocksize=10000,
-                set_verbose=True, tau0=None, zp1=None, fixed=None, p_fix=None, baldwin=None, transfunc=2):
+                set_verbose=True, tau0=None, zp1=None, fixed=None, p_fix=None, 
+                baldwin=None, transfunc=2, alphalimit=None):
         """ See `lnpostfn_photo_p` for doc, except for `laglimit` and `widlimit`,
         both of which have different default values ('baseline' / 'nyquist').
         'baseline' means the boundaries are naturally determined by the
@@ -2365,7 +2366,7 @@ class Pmap_Model(object):
                                   args=(self.zydata, self.GPmodel, self.hascontlag, conthpd, ratiohpd, set_extraprior,
                                         lagtobaseline, laglimit, widtobaseline,
                                         widlimit, set_threading, blocksize,
-                                        False, False, None, tau0, zp1, fixed, p_fix, baldwin, self.transfunc), threads=threads)
+                                        False, False, None, tau0, zp1, fixed, p_fix, baldwin, self.transfunc, alphalimit), threads=threads)
         pos, prob, state = sampler.run_mcmc(p0, nburn)
         if set_verbose:
             print("burn-in finished")
