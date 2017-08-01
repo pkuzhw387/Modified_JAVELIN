@@ -1844,10 +1844,6 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
             # signals in the light curves.
             prior2 += np.log(np.abs(llags[0])/(lagtobaseline*zydata.rj))
 
-    
-    if tau0 is not None:
-        if tau > 10.0 * tau0:
-            return -np.inf
 
     # penalize parameters to be impossible
     if zp1 is not None and tau0 is not None:
@@ -1869,7 +1865,7 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
         if llags[2 * i] < 0.0:
             return -np.inf
 
-        if alphalimit is not None and p[5 + 5 * i] > alphalimit * np.mean(zydata.rlist[i + 1]):
+        if alphalimit is not None and p[5 + 4 * i] > alphalimit * np.mean(zydata.rlist[i + 1]):
             return -np.inf
 
         if zp1 is not None and tau0 is not None:
@@ -1884,11 +1880,15 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
         if llags[0] > laglimit[0][1] or llags[0] < laglimit[0][0]:
             prior2 += my_pos_inf
     if (GPmodel == "pow-law"):
-        if A < 0 or A > 1 or gamma < 0 or gamma > 1:
+        if A < 0 or gamma < 0 or gamma > 1:
             # print "3st -inf"
             prior2 += my_pos_inf
     elif (GPmodel == "DRW"):
-        if sigma < 1e-5 or sigma > 1 or tau < 0 or tau > 10.0 * zydata.rj:
+        if tau0 is not None and fixed[1]:
+            if tau > 10.0 * tau0:
+                return -np.inf
+        if tau < 0 or tau > 10.0 * zydata.rj:
+        # if sigma < 1e-5 or sigma > 1 or tau < 0 or tau > 10.0 * zydata.rj:
             # print "4st -inf"
             prior2 += my_pos_inf
     # penalize on extremely large transfer function width
@@ -1952,7 +1952,9 @@ def lnpostfn_photo_p(p, zydata, GPmodel="DRW", hascontlag=False, conthpd=None, r
         return(vals)
     else:
         logp = logl + prior
-        # print "logp: ", logp
+        # print "prior: ", prior
+        # print "logl: ", logl
+        # yyy = raw_input("just for pause")
         return(logp)
 
 

@@ -9,6 +9,7 @@ from graphic import figure_handler
 import numpy as np
 from numpy.random import normal, multivariate_normal
 from copy import copy, deepcopy
+import warnings
 
 """ Load light curve files into a LightCurve object.
 """
