@@ -949,6 +949,9 @@ elseif((id1.ge.2).and.(id2.ge.2)) then
     endif
 endif
 
+tlow = tlow / 365.25D0
+thig = thig / 365.25D0
+twidth = twidth / 365.25D0
 
 if (thig.le.0.0D0) then
    getcmat_lc_PL = - (-thig)**gama * thig + (-tlow)**gama * tlow + 2D0 * thig * 10D0**gama&
@@ -984,6 +987,12 @@ emscale = scale
 tlow = jd1-jd2-twidth
 tmid = jd1-jd2
 thig = jd1-jd2+twidth
+
+
+tlow = tlow / 365.25D0
+thig = thig / 365.25D0
+tmid = tmid / 365.25D0
+twidth = twidth / 365.25D0
 
 if (tlow.ge.0.0D0) then
     getcmat_lauto_PL = - tlow**(2D0 + gama) + 4D0 * tlow * tmid * ((2D0 * tmid - tlow)**gama&
@@ -1054,8 +1063,19 @@ tmid1 = (ti-tj)-(t2-t4)
 tmid2 = (ti-tj)-(t1-t3)
 thig  = (ti-tj)-(t1-t4)
 
-print*, "Not implemented yet!"
-getcmat_lcross_PL = -1.0D0
+tlow = tlow / 365.25D0
+tmid1 = tmid1 / 365.25D0
+tmid2 = tmid2 / 365.25D0
+thig = thig / 365.25D0
+
+twidth1 = twidth1 / 365.25D0
+twidth2 = twidth2 / 365.25D0
+
+getcmat_lcross_PL = 10D0**gama + 1 / ((gama + 2D0) * (2D0 * gama + 2D0) * twidth1 * twidth2) * &
+                    (dabs(tmid1)**(gama + 2D0) + dabs(tmid2)**(gama + 2D0) &
+                    &- dabs(thig)**(gama + 2D0) - dabs(tlow)**(gama + 2D0))
+
+getcmat_lcross_PL = scale1 * scale2 * getcmat_lcross_PL
 
 
 RETURN
