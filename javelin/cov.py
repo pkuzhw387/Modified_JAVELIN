@@ -2,7 +2,7 @@
 
 all = ['get_covfunc_dict', 'covname_dict', 'MyCovariance']
 
-from gp.cov_funs import matern, pow_exp, pareto_exp, kepler_exp, pow_tail, wkepler_exp
+from gp.cov_funs import matern, pow_exp, pareto_exp, kepler_exp, pow_tail, wkepler_exp, pow_law
 import numpy as np
 
 """ Wrapping the all the continuum (source, without lines) covariance functions together.
@@ -18,6 +18,7 @@ covname_dict = {
                 "kepler2_exp" : kepler_exp.euclidean,
                 "wkepler_exp"  : wkepler_exp.euclidean,
                 "wkepler2_exp" : wkepler_exp.euclidean,
+                "pow-law"     : pow_law.euclidean
                }
 
 
@@ -42,9 +43,10 @@ def get_covfunc_dict(covfunc, **covparams):
 
     """
     _cov_dict = {}
-    _cov_dict['eval_fun'] = covname_dict[covfunc]
-    _cov_dict['amp']      = covparams['sigma']
-    _cov_dict['scale']    = covparams['tau']
+    if covfunc != "pow-law":
+        _cov_dict['eval_fun'] = covname_dict[covfunc]
+        _cov_dict['amp']      = covparams['sigma']
+        _cov_dict['scale']    = covparams['tau']
     if covfunc == "drw" :
         _cov_dict['pow']         = 1.0
     elif covfunc == "matern" :
@@ -61,6 +63,10 @@ def get_covfunc_dict(covfunc, **covparams):
         _cov_dict['tcut']        = covparams['nu']/covparams['tau']
     elif covfunc == "pow_tail" :
         _cov_dict['beta']        = covparams['nu']
+    elif covfunc == "pow-law":
+        _cov_dict['eval_fun'] = covname_dict[covfunc]
+        _cov_dict['A'] = covparams['A']
+        _cov_dict['pow'] = covparams['gamma']
     else :
         raise RuntimeError("%s has not been implemented"%covfunc)
     return(_cov_dict)

@@ -1535,11 +1535,15 @@ class Rmap_Model(object):
 # 
 # 
 
-def Baldwin_scale(zydata=None, line_ind=1, norm=None, slope=None, sigma=0.0, tau=0.0, lag=0.0, alpha=1.0):
+def Baldwin_scale(zydata=None, covfunc='drw', line_ind=1, norm=None, slope=None, lag=0.0, alpha=1.0, **covparams):
     # the function used to calculate the line-to-cont scale using Baldwin relation.
     # Parameters:
     # zydata: LightCurve object
     #         used to provide the continuum flux.
+    #         
+    # covfunc: str, optional
+    #       the form of covariance function.
+    #       Default: 'drw'
     # line_ind: int
     #           used to indicate which emission line is being processed.
     # norm: float
@@ -1557,12 +1561,14 @@ def Baldwin_scale(zydata=None, line_ind=1, norm=None, slope=None, sigma=0.0, tau
     #        the underlying scale of the line-cont continuum to the pure-cont continuum
     if lag == 0.0:
         warnings.warn('zero lags used in Baldwin scale calculation.')
-    if sigma == 0.0 or tau <= 0.0:
-        raise ValueError, "Invalid input DRW parameters for calculating Baldwin line scale."
+
+    if covparams[covparams.keys()[0]] == 0.0 or covparams[covparams.keys()[1]] <= 0.0:
+        raise ValueError, "Invalid input GP parameters for calculating Baldwin line scale."
+
     if zydata is None or norm is None or slope is None:
         raise ValueError, "Insufficient input for calculating Baldwin line scale."
     else:
-        ps = PredictSignal(zydata=zydata, sigma=sigma, tau=tau)
+        ps = PredictSignal(zydata=zydata, covfunc=covfunc, **covparams)
         delayed_cont_flux = ps.mve_var(jwant=(zydata.jlist[0] - lag))[0]
         # print "simulated delayed continuum flux: ", delayed_cont_flux
         # print "actual continuum fluxes: ", zydata.mlist[0]

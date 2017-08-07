@@ -1028,11 +1028,11 @@ return
 END FUNCTION getcmat_lauto_PL
 
 
-FUNCTION getcmat_lcross_PL(id1,id2,jd1,jd2,tau,slag1,swid1,scale1,slag2,swid2,scale2)
+FUNCTION getcmat_lcross_PL(id1,id2,jd1,jd2,gama,slag1,swid1,scale1,slag2,swid2,scale2)
 implicit none
 REAL(kind=8) :: getcmat_lcross_PL
 INTEGER(kind=4) ::  id1,id2
-REAL(kind=8) ::  jd1,jd2,tau
+REAL(kind=8) ::  jd1,jd2,gama
 REAL(kind=8) ::  slag1,swid1,scale1,slag2,swid2,scale2
 REAL(kind=8) ::  twidth1,twidth2,bottleneck
 REAL(kind=8) :: t1,t2,t3,t4,ti,tj,tlow,tmid1,tmid2,thig

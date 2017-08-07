@@ -837,6 +837,52 @@ cf2py threadsafe
       return
       END
 
+
+
+
+      SUBROUTINE pow_law(C,pow,nx,ny,cmin,cmax,symm)
+
+cf2py intent(inplace) C
+cf2py intent(hide) nx,ny
+cf2py logical intent(in), optional:: symm=0
+cf2py integer intent(in), optional :: cmin=0
+cf2py integer intent(in), optional :: cmax=-1
+cf2py threadsafe
+
+      INTEGER nx,ny,i,j,cmin,cmax
+      DOUBLE PRECISION C(nx,ny)
+      DOUBLE PRECISION pow
+      LOGICAL symm
+
+      if (cmax.EQ.-1) then
+          cmax = ny
+      end if
+
+
+      if(symm) then
+
+        do j=cmin+1,cmax
+          C(j,j)=1.0D0
+          do i=1,j-1
+            C(i,j) = 10D0**pow - 0.5D0 * (dabs(C(i,j)) / 365.25D0)**pow
+!             C(j,i) = C(i,j)
+          enddo
+        enddo
+
+      else
+
+        do j=cmin+1,cmax
+          do i=1,nx
+            C(i,j) = 10D0**pow - 0.5D0 * (dabs(C(i,j)) / 365.25D0)**pow
+          enddo
+        enddo
+
+      endif
+
+
+      return
+      END
+
       SUBROUTINE pareto_exp(C,alpha,nx,ny,cmin,cmax,symm)
 
 cf2py intent(inplace) C
